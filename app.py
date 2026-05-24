@@ -24,6 +24,13 @@ from src.news_digest import analyze_manual_news, save_manual_news_note
 from src.daily_tactical_engine import TacticalInputs, daily_tactical_engine
 from src.fund_nav_provider import get_latest_fund_navs_for_funds, normalize_fund_code
 from src.gold_defense_engine import evaluate_gold_defense
+from src.public_data_loader import (
+    PUBLIC_TICKERS,
+    build_public_asset_table,
+    infer_public_market_status,
+    load_public_ohlc_data,
+    load_public_market_snapshot,
+)
 
 
 ROOT_DIR = Path(__file__).parent
@@ -65,24 +72,44 @@ def main() -> None:
     apply_custom_css()
 
     latest_report = find_latest_report()
-    if latest_report is None:
+    public_snapshot = pd.DataFrame()
+    using_public_fallback = False
+    if latest_report is None and is_public_mode(app_mode):
+        public_snapshot = load_public_market_snapshot()
+        asset_table = build_public_asset_table(public_snapshot)
+        market_status = infer_public_market_status(public_snapshot)
+        report_text = build_public_snapshot_report(asset_table, market_status)
+        report_date = datetime.now().strftime("%Y-%m-%d")
+        news_text = "## 每日投资资讯摘要\n\n公网展示版暂未接入实时新闻缓存，新闻页展示研究框架。"
+        news_csv = None
+        dca_table = pd.DataFrame()
+        news_items = pd.DataFrame()
+        using_public_fallback = True
+    elif latest_report is None:
         st.warning("当前 reports 文件夹没有 daily risk report，请先运行：python main.py")
         report_text = ""
         report_date = "unknown"
         market_status = "unknown"
+        news_text = load_latest_news_text(report_text)
+        news_csv = find_latest_news_csv()
+        asset_table = parse_asset_table(report_text)
+        dca_table = parse_markdown_table(report_text, "基金")
+        news_items = load_latest_news_items(news_csv, news_text)
     else:
         report_text = latest_report.read_text(encoding="utf-8")
         report_date = extract_report_date(latest_report, report_text)
         market_status = extract_market_status(report_text)
-
-    news_text = load_latest_news_text(report_text)
-    news_csv = find_latest_news_csv()
-    asset_table = parse_asset_table(report_text)
-    dca_table = parse_markdown_table(report_text, "基金")
-    news_items = load_latest_news_items(news_csv, news_text)
+        news_text = load_latest_news_text(report_text)
+        news_csv = find_latest_news_csv()
+        asset_table = parse_asset_table(report_text)
+        dca_table = parse_markdown_table(report_text, "基金")
+        news_items = load_latest_news_items(news_csv, news_text)
     portfolio = load_yaml(active_portfolio_path(app_mode))
     policy = load_yaml(POLICY_PATH)
-    final_decision = build_final_decision(portfolio, policy, asset_table, market_status, report_text, news_text)
+    if using_public_fallback:
+        final_decision = build_public_fallback_decision(public_snapshot)
+    else:
+        final_decision = build_final_decision(portfolio, policy, asset_table, market_status, report_text, news_text)
 
     selected_page = render_sidebar(profile, report_date, app_mode)
     render_mode_banner(app_mode)
@@ -130,7 +157,7 @@ def main() -> None:
     elif selected_page == "执行复盘记录":
         render_execution_review_page(final_decision, app_mode)
     elif selected_page == "部署健康检查":
-        render_deployment_health_check(app_mode)
+        render_deployment_health_check(app_mode, public_snapshot, using_public_fallback)
 
     with st.expander("完整日报与市场结构", expanded=False):
         render_risk_chart(asset_table, "home_report_expander")
@@ -154,6 +181,74 @@ def find_latest_report() -> Path | None:
         reverse=True,
     )
     return reports[0] if reports else None
+
+
+def build_public_snapshot_report(asset_table: pd.DataFrame, market_status: str) -> str:
+    """Build a lightweight public report from market snapshot data."""
+
+    lines = [
+        "# Public Market Snapshot",
+        "",
+        f"报告日期：{datetime.now().strftime('%Y-%m-%d')}",
+        f"总体市场状态：{market_status}",
+        "",
+        "## 资产风险观察",
+        "",
+    ]
+    if asset_table.empty:
+        lines.append("公开市场数据暂不可用。")
+        return "\n".join(lines)
+    columns = ["资产", "代码", "最新价格", "今日涨跌幅", "RSI", "当前回撤", "风险状态"]
+    lines.append("| " + " | ".join(columns) + " |")
+    lines.append("| " + " | ".join(["---"] * len(columns)) + " |")
+    for _, row in asset_table.iterrows():
+        lines.append("| " + " | ".join(str(row.get(column, "")) for column in columns) + " |")
+    lines.extend(
+        [
+            "",
+            "## 市场结构解读",
+            "",
+            "公网展示版使用公开市场行情自动生成，仅用于模型展示和风险观察。",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def build_public_fallback_decision(snapshot: pd.DataFrame) -> dict:
+    """Build public-only fallback display decision when no daily report exists."""
+
+    mode = "normal_dca"
+    if not snapshot.empty:
+        focus = snapshot.loc[snapshot["代码"].isin(["QQQ", "SMH"])]
+        if not focus.empty and (pd.to_numeric(focus["RSI数值"], errors="coerce") > 70).any():
+            mode = "do_not_chase"
+    if mode == "do_not_chase":
+        return {
+            "market_mode": "do_not_chase",
+            "daily_dca_amount": 60,
+            "use_tactical_cash": False,
+            "tactical_cash_amount": 0,
+            "fund_allocation": do_not_chase_allocation(),
+            "gold_action": "公网展示：黄金按两周计划择时观察，不纳入每日基础定投。",
+            "risk_discipline": "维持基础节奏，不追高，不动用灵活资金",
+            "top_summary": "公开行情显示短线偏热",
+            "cash_explanation": "公网展示模式不显示灵活资金金额，也不生成买入指令。",
+            "explanation": ["public fallback：QQQ/SMH RSI 偏热，展示为 do_not_chase。"],
+            "tactical_cash_action": "不动用灵活加仓资金",
+        }
+    return {
+        "market_mode": "normal_dca",
+        "daily_dca_amount": 60,
+        "use_tactical_cash": False,
+        "tactical_cash_amount": 0,
+        "fund_allocation": do_not_chase_allocation(),
+        "gold_action": "公网展示：黄金按两周计划择时观察，不纳入每日基础定投。",
+        "risk_discipline": "维持基础节奏，不动用灵活资金",
+        "top_summary": "公开行情中性观察",
+        "cash_explanation": "公网展示模式不显示灵活资金金额，也不生成买入指令。",
+        "explanation": ["public fallback：未检测到明显过热，展示为 normal_dca。"],
+        "tactical_cash_action": "不动用灵活加仓资金",
+    }
 
 
 def load_user_profile() -> dict:
@@ -1547,14 +1642,22 @@ def render_config_status(latest_report: Path | None) -> None:
     col4.caption(f"最后报告生成时间：{format_path_mtime(latest_report)}")
 
 
-def render_deployment_health_check(app_mode: dict) -> None:
+def render_deployment_health_check(app_mode: dict, public_snapshot: pd.DataFrame | None = None, using_public_fallback: bool = False) -> None:
     """Render public-safe deployment checks without exposing local paths."""
 
     st.subheader("部署健康检查")
+    snapshot = public_snapshot if public_snapshot is not None and not public_snapshot.empty else load_public_market_snapshot()
+    available_count = 0 if snapshot.empty else int((snapshot["data_quality"] != "missing").sum())
+    missing_count = len(PUBLIC_TICKERS) - available_count
     checks = [
         {"检查项": "app_mode", "状态": app_mode.get("mode", "unknown")},
         {"检查项": "是否 public", "状态": "是" if is_public_mode(app_mode) else "否"},
         {"检查项": "敏感金额隐藏", "状态": "是" if is_public_mode(app_mode) else "private 显示"},
+        {"检查项": "public_data_loader", "状态": "可用"},
+        {"检查项": "market snapshot", "状态": "成功" if available_count else "全部缺失"},
+        {"检查项": "可用 ticker 数量", "状态": str(available_count)},
+        {"检查项": "缺失 ticker 数量", "状态": str(missing_count)},
+        {"检查项": "reports 缺失 fallback", "状态": "已使用 public fallback" if using_public_fallback else "未触发"},
         {"检查项": "requirements.txt", "状态": "存在" if (ROOT_DIR / "requirements.txt").exists() else "缺失"},
         {"检查项": "Streamlit config", "状态": "存在" if (ROOT_DIR / ".streamlit" / "config.toml").exists() else "缺失"},
         {"检查项": "public portfolio", "状态": "存在" if PORTFOLIO_PUBLIC_PATH.exists() else "缺失"},
@@ -2316,6 +2419,9 @@ def render_fund_monitor_page(portfolio: dict, final_decision: dict, app_mode: di
     if funds.empty:
         st.warning("未找到 portfolio.yaml 中的基金列表。")
         return
+    if is_public_mode(app_mode):
+        render_public_fund_monitor_page(funds, final_decision)
+        return
 
     proxy_symbols = sorted({symbol for _, fund in funds.iterrows() for symbol in fund_proxy_basket(fund)})
     proxy_data = load_chart_market_data(proxy_symbols, "1y") if proxy_symbols else {}
@@ -2379,6 +2485,34 @@ def render_fund_monitor_page(portfolio: dict, final_decision: dict, app_mode: di
     for _, row in monitor.iterrows():
         with st.expander(str(row["基金名称"]), expanded=False):
             render_fund_detail(row, proxy_data)
+
+
+def render_public_fund_monitor_page(funds: pd.DataFrame, final_decision: dict) -> None:
+    """Render public-safe fund structure and reference-market monitor."""
+
+    st.info("公网版不展示真实基金净值，仅展示模型结构和公开市场参考。参考市场不等于基金当日真实涨跌。")
+    proxy_symbols = sorted({symbol for _, fund in funds.iterrows() for symbol in fund_proxy_basket(fund)})
+    proxy_data = load_chart_market_data(proxy_symbols, "1y") if proxy_symbols else {}
+    rows = []
+    for _, fund in funds.iterrows():
+        basket = fund_proxy_basket(fund)
+        signal = aggregate_fund_proxy_signal(basket, proxy_data)
+        rows.append(
+            {
+                "基金名称": fund.get("fund_name", ""),
+                "主题": fund.get("theme", ""),
+                "目标占比": format_percent_plain(parse_numeric_amount(fund.get("target_weight"))),
+                "风险等级": fund.get("risk_level", ""),
+                "组合角色": fund.get("role_in_portfolio", ""),
+                "参考市场": " / ".join(signal["used_symbols"]) if signal["used_symbols"] else "missing",
+                "参考市场今日涨跌": format_percent_plain(signal["today_return"]) if signal["today_return"] is not None else "数据不足",
+                "参考市场 RSI": f"{signal['rsi']:.1f}" if signal["rsi"] is not None else "数据不足",
+                "数据说明": "public demo / 无真实净值",
+                "今日动作说明": "不生成买入金额；最终动作仍读取 final_decision。",
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.caption(f"当前 public 展示模式：{final_decision.get('market_mode', 'unknown')}。不显示真实金额、基金净值、机动资金或账户数据。")
 
 
 def load_or_fetch_fund_navs(funds: pd.DataFrame) -> pd.DataFrame:
@@ -3561,36 +3695,8 @@ def render_market_charts_page(
 def load_chart_market_data(symbols: list[str], period: str) -> dict[str, pd.DataFrame]:
     """Load OHLC data from yfinance and fall back to local close-price cache."""
 
-    data = {symbol: pd.DataFrame() for symbol in symbols}
-    try:
-        raw = yf.download(
-            tickers=symbols,
-            period=period,
-            interval="1d",
-            auto_adjust=False,
-            progress=False,
-            group_by="ticker",
-            threads=True,
-        )
-    except Exception:
-        raw = pd.DataFrame()
-
-    if not raw.empty:
-        for symbol in symbols:
-            try:
-                frame = raw[symbol].copy() if isinstance(raw.columns, pd.MultiIndex) else raw.copy()
-                frame = normalize_ohlc_frame(frame)
-                if not frame.empty:
-                    frame.attrs["data_source"] = "yfinance"
-                    data[symbol] = frame
-            except Exception:
-                data[symbol] = pd.DataFrame()
-
-    missing = [symbol for symbol, frame in data.items() if frame.empty]
-    if missing:
-        fallback = download_yahoo_chart_api(missing, period)
-        data.update({symbol: fallback.get(symbol, data.get(symbol, pd.DataFrame())) for symbol in missing})
-        missing = [symbol for symbol, frame in data.items() if frame.empty]
+    data = load_public_ohlc_data(symbols, period)
+    missing = [symbol for symbol, frame in data.items() if frame is None or frame.empty]
     if missing:
         fallback = load_price_cache_for_charts(missing)
         data.update({symbol: fallback.get(symbol, pd.DataFrame()) for symbol in missing})
@@ -4132,6 +4238,8 @@ def render_news_digest_page(news_text: str, news_items: pd.DataFrame, app_mode: 
     """Render daily news digest."""
 
     st.subheader("新闻与主题观察")
+    if is_public_mode(app_mode) and news_items.empty:
+        st.info("公网展示版暂未接入实时新闻缓存，新闻页展示研究框架。")
     if not news_items.empty:
         col1, col2 = st.columns(2)
         col1.metric("新闻条数", len(news_items))
@@ -4164,7 +4272,10 @@ def render_news_cards(news_items: pd.DataFrame, app_mode: dict, final_decision: 
     """Render structured news cards with content summary and action translation."""
 
     if news_items.empty:
-        st.info("暂无可解析的新闻条目。")
+        if is_public_mode(app_mode):
+            st.info("暂无实时新闻缓存。公网版仍保留新闻投研框架：新闻只用于解释主线、风险和观察池，不覆盖 final_decision。")
+        else:
+            st.info("暂无可解析的新闻条目。")
         return
 
     ranked = rank_news_items(news_items).head(5)

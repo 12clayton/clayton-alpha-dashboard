@@ -20,7 +20,7 @@ Before showing the dashboard to others or deploying it online, force public mode
 APP_MODE=public python -m streamlit run app.py
 ```
 
-On Streamlit Community Cloud, the app also attempts to detect the hosted environment and default to public mode. Public mode reads `config/portfolio_public.yaml` when available.
+On Streamlit Community Cloud, the app also attempts to detect the hosted environment and default to public mode. Public mode reads `config/portfolio_public.yaml` when available. If `reports/` and `data/` are not uploaded, public mode automatically builds a public market snapshot from QQQ, SMH, SOXX, GLD, SPY, ACWI, UUP, TLT, and GC=F.
 
 Public mode hides:
 
@@ -63,7 +63,10 @@ Do not upload private or generated local files:
 - `.streamlit/secrets.toml`
 - `data/fund_nav_cache.csv`
 - `data/fund_manual_nav.csv`
+- `data/`
+- `data_cache.csv`
 - `reports/execution_review.csv`
+- `reports/`
 - `config/portfolio.yaml`
 - `config/dca_policy.yaml`
 - `backups/`
