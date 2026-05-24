@@ -401,10 +401,25 @@ def mask_sensitive_value(value=None) -> str:
 def mask_amounts_in_text(text: str) -> str:
     """Mask currency and obvious amount values in public text."""
 
-    masked = re.sub(r"¥\s?[\d,]+(?:\.\d+)?", "已隐藏", text)
+    masked = str(text)
+    masked = re.sub(r"¥\s?[\d,]+(?:\.\d+)?", "金额已隐藏", masked)
     masked = re.sub(r"(?<![\dA-Za-z])\d+(?:\.\d+)?\s?元", "已隐藏", masked)
+    masked = re.sub(r"(daily_dca_amount|tactical_cash_amount)\s*[:=]\s*[\d,.]+", r"\1=已隐藏", masked)
+    masked = re.sub(r"今日金额仍为\s*金额已隐藏", "今日按系统纪律执行，不展示金额", masked)
+    masked = re.sub(r"今日最终动作：执行\s*金额已隐藏", "今日最终动作：按系统纪律执行", masked)
+    masked = re.sub(r"执行\s*金额已隐藏", "按计划执行", masked)
+    masked = re.sub(r"维持基础定投\s*金额已隐藏", "维持基础定投节奏", masked)
+    masked = re.sub(r"基础定投\s*金额已隐藏", "基础定投金额已隐藏", masked)
+    masked = re.sub(r"建议金额[:：]\s*金额已隐藏", "建议金额：已隐藏", masked)
+    masked = re.sub(r"使用金额[^。\n]*", "使用金额：已隐藏", masked)
     masked = re.sub(r"机动资金[^。\n]*", "机动资金：已隐藏", masked)
     return masked
+
+
+def public_text(text: str, app_mode: dict) -> str:
+    """Mask execution amounts in public mode while preserving NAV/percent data."""
+
+    return mask_amounts_in_text(str(text)) if is_public_mode(app_mode) else str(text)
 
 
 def show_sensitive_paths(app_mode: dict) -> bool:
@@ -858,9 +873,9 @@ def render_home_page(
           <div class="muted" style="margin-top:4px;">{format_chinese_date(now)}</div>
           <div class="hero-grid">
             <div class="hero-mini"><div class="label">今日状态</div><div class="value green-value">{final_decision['market_mode']}</div></div>
-            <div class="hero-mini"><div class="label">今日纪律</div><div class="value orange-value">{final_decision['risk_discipline']}</div></div>
-            <div class="hero-mini"><div class="label">今日主线</div><div class="value blue-value">{final_decision['top_summary']}</div></div>
-            <div class="hero-mini"><div class="label">今日防守</div><div class="value gold-value">{final_decision['gold_action']}</div></div>
+            <div class="hero-mini"><div class="label">今日纪律</div><div class="value orange-value">{public_text(final_decision['risk_discipline'], app_mode)}</div></div>
+            <div class="hero-mini"><div class="label">今日主线</div><div class="value blue-value">{public_text(final_decision['top_summary'], app_mode)}</div></div>
+            <div class="hero-mini"><div class="label">今日防守</div><div class="value gold-value">{public_text(final_decision['gold_action'], app_mode)}</div></div>
           </div>
         </div>
         """,
@@ -871,11 +886,11 @@ def render_home_page(
     st.markdown(f'<div class="motivation">Clayton 今日提醒：{motivation}</div>', unsafe_allow_html=True)
 
     render_clayton_alpha_model(portfolio, asset_table, market_status, app_mode, final_decision)
-    render_home_news_summary(news_items, final_decision)
+    render_home_news_summary(news_items, final_decision, app_mode)
     render_gold_defense_monitor(portfolio, asset_table, app_mode)
     render_tactical_cash_checklist(asset_table, market_status, final_decision, app_mode)
     with st.expander("更多账户与风险指标", expanded=False):
-        render_status_cards(profile, final_decision)
+        render_status_cards(profile, final_decision, app_mode)
         render_core_dashboard_cards(profile, portfolio, policy, asset_table, dca_table, app_mode, final_decision)
     if show_sensitive_paths(app_mode):
         render_config_status(latest_report)
@@ -955,21 +970,33 @@ def render_today_final_action(final_decision: dict, portfolio: dict, asset_table
     gold_result = evaluate_gold_defense(portfolio, asset_table)
     gold_status = build_gold_cycle_status(gold_result)
     cash_text = "动用" if decision["use_tactical_cash"] else "不动用"
-    cash_amount = f"¥{decision.get('tactical_cash_amount', 0):,.0f}" if private_mode else ("是" if decision["use_tactical_cash"] else "否")
+    cash_amount = f"¥{decision.get('tactical_cash_amount', 0):,.0f}" if private_mode else ("等待机会" if decision["use_tactical_cash"] else "不动用")
     one_liner = build_today_one_liner(decision)
 
     st.markdown('<div class="final-action-panel">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">今日最终动作</div>', unsafe_allow_html=True)
-    cards = [
-        ("今日模式", decision["market_mode"], ""),
-        ("基础定投", f"¥{decision['daily_dca_amount']}", "big"),
-        ("灵活资金", f"{cash_text} / {cash_amount}", ""),
-        ("黄金", gold_status, ""),
-        ("一句话结论", one_liner, ""),
-        ("今日纪律提醒", decision["risk_discipline"], ""),
-        ("本轮黄金建议", gold_result["suggestion"], ""),
-        ("最终金额来源", "final_decision", ""),
-    ]
+    if private_mode:
+        cards = [
+            ("今日模式", decision["market_mode"], ""),
+            ("基础定投", f"¥{decision['daily_dca_amount']}", "big"),
+            ("灵活资金", f"{cash_text} / {cash_amount}", ""),
+            ("黄金", gold_status, ""),
+            ("一句话结论", one_liner, ""),
+            ("今日纪律提醒", decision["risk_discipline"], ""),
+            ("本轮黄金建议", gold_result["suggestion"], ""),
+            ("最终金额来源", "final_decision", ""),
+        ]
+    else:
+        cards = [
+            ("今日模式", decision["market_mode"], ""),
+            ("基础定投", "按计划执行 / 暂不展示金额", "big"),
+            ("灵活资金", "不动用" if not decision["use_tactical_cash"] else "等待机会", ""),
+            ("黄金", "按两周计划观察", ""),
+            ("一句话结论", public_text(one_liner, app_mode), ""),
+            ("今日纪律提醒", public_text(decision["risk_discipline"], app_mode), ""),
+            ("本轮黄金建议", "按计划观察，不展示金额", ""),
+            ("最终金额来源", "final_decision", ""),
+        ]
     html_parts = ['<div class="decision-grid">']
     for label, value, extra in cards:
         html_parts.append(
@@ -981,7 +1008,7 @@ def render_today_final_action(final_decision: dict, portfolio: dict, asset_table
     st.markdown("**今日基金分配**")
     st.dataframe(build_tactical_allocation_display(decision, private_mode), use_container_width=True, hide_index=True)
     with st.expander("为什么这么做", expanded=False):
-        st.write("；".join(decision.get("explanation", [])) or decision["cash_explanation"])
+        st.write(public_text("；".join(decision.get("explanation", [])) or decision["cash_explanation"], app_mode))
         st.write("黄金不计入每日固定定投，按两周防守补仓计划单独观察。")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1074,27 +1101,29 @@ def render_tactical_cash_checklist(asset_table: pd.DataFrame, market_status: str
         {"检查项": "是否 risk-off", "结果": "是" if risk_off else "否"},
         {"检查项": "是否 do_not_chase", "结果": "是" if do_not_chase else "否"},
         {"检查项": "最终结论", "结果": "动用" if final_use else "不动用"},
-        {"检查项": "使用金额", "结果": ("金额已隐藏" if is_public_mode(app_mode) else f"¥{final_decision.get('tactical_cash_amount', 0):,.0f}") if final_use else "¥0"},
+        {"检查项": "使用金额", "结果": "不展示金额" if is_public_mode(app_mode) else (f"¥{final_decision.get('tactical_cash_amount', 0):,.0f}" if final_use else "¥0")},
     ]
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
-def render_home_news_summary(news_items: pd.DataFrame, final_decision: dict) -> None:
+def render_home_news_summary(news_items: pd.DataFrame, final_decision: dict, app_mode: dict | None = None) -> None:
     """Render only the overall news judgment on the home page."""
 
     st.markdown("### 每日投资简报")
-    st.info(build_news_overall_judgment(news_items, final_decision))
+    text = build_news_overall_judgment(news_items, final_decision)
+    st.info(public_text(text, app_mode or {"mode": "private"}))
 
 
-def render_status_cards(profile: dict, final_decision: dict | None = None) -> None:
+def render_status_cards(profile: dict, final_decision: dict | None = None, app_mode: dict | None = None) -> None:
     """Render four status cards."""
 
     final_decision = final_decision or {}
+    app_mode = app_mode or {"mode": "private"}
     cards = [
         ("今日状态", final_decision.get("market_mode", profile["current_status"]), "green-value gold-border"),
-        ("今日纪律", final_decision.get("risk_discipline", profile["current_discipline"]), "orange-value"),
-        ("今日主线", final_decision.get("top_summary", profile["current_main_theme"]), "blue-value"),
-        ("今日防守", final_decision.get("gold_action", profile["current_defense"]), "gold-value"),
+        ("今日纪律", public_text(final_decision.get("risk_discipline", profile["current_discipline"]), app_mode), "orange-value"),
+        ("今日主线", public_text(final_decision.get("top_summary", profile["current_main_theme"]), app_mode), "blue-value"),
+        ("今日防守", public_text(final_decision.get("gold_action", profile["current_defense"]), app_mode), "gold-value"),
     ]
     cols = st.columns(4)
     for col, (label, value, css_class) in zip(cols, cards):
@@ -1121,11 +1150,13 @@ def render_core_dashboard_cards(
     """Render core dashboard cards."""
 
     metrics = calculate_dashboard_metrics(profile, portfolio, policy, asset_table, dca_table, app_mode, final_decision)
+    dca_label = "今日执行状态" if is_public_mode(app_mode) else "今日建议定投金额"
+    cash_label = "灵活资金状态" if is_public_mode(app_mode) else "机动资金余额"
     rows = [
         [
             ("总资产", metrics["total_amount"], "gold-value"),
-            ("今日建议定投金额", metrics["daily_dca"], "green-value"),
-            ("机动资金余额", metrics["tactical_cash"], "orange-value"),
+            (dca_label, metrics["daily_dca"], "green-value"),
+            (cash_label, metrics["tactical_cash"], "orange-value"),
             ("黄金仓位进度", metrics["gold_weight"], "gold-value"),
         ],
         [
@@ -1203,9 +1234,13 @@ def render_gold_defense_monitor(portfolio: dict, asset_table: pd.DataFrame, app_
     private_mode = is_private_mode(app_mode)
     weight_text = f"{result['gold_weight']:.2%}" if private_mode else gold_target_public_text(result["gold_weight"])
     cycle_status = build_gold_cycle_status(result)
+    if not private_mode:
+        cycle_status = mask_amounts_in_text(cycle_status).replace("建议 金额已隐藏", "建议按计划观察")
     gold_record = load_gold_replenishment_record()
     executed_amount = gold_record.get("amount", 0)
     suggestion_text = result["suggestion"]
+    if not private_mode:
+        suggestion_text = "按计划观察，不展示金额"
     if executed_amount > 0:
         suggestion_text = f"已执行 ¥{executed_amount:.0f}" if private_mode else "已执行"
 
@@ -1215,13 +1250,14 @@ def render_gold_defense_monitor(portfolio: dict, asset_table: pd.DataFrame, app_
     st.caption("黄金模块只影响易方达黄金ETF联接A的两周补仓观察，不影响半导体/CPO/CPU主攻框架、纳指定投金额或灵活资金使用。")
     if executed_amount > 0:
         amount_text = f" ¥{executed_amount:.0f}" if private_mode else ""
-        st.success(f"本轮黄金补仓已执行{amount_text}，等待下一轮两周检查。今日基础定投仍然是 ¥60，黄金额外补仓不计入 daily_dca_amount，不触发机动资金。")
+        detail = f"本轮黄金补仓已执行{amount_text}，等待下一轮两周检查。今日基础定投仍然是 ¥60，黄金额外补仓不计入 daily_dca_amount，不触发机动资金。"
+        st.success(public_text(detail, app_mode))
 
     cards = [
         ("黄金目标仓位", "8%–10%", "gold-value"),
         ("当前黄金仓位", weight_text, "gold-value"),
         ("本轮两周补仓状态", cycle_status, "gold-value"),
-        ("今日黄金补仓金额", f"¥{executed_amount:.0f}" if private_mode and executed_amount > 0 else ("已执行" if executed_amount > 0 else "¥0"), "gold-value"),
+        ("今日黄金补仓金额", f"¥{executed_amount:.0f}" if private_mode and executed_amount > 0 else ("已执行" if executed_amount > 0 else "不展示金额"), "gold-value"),
         ("本轮两周黄金补仓建议", suggestion_text, "gold-value"),
         ("gold_mode", result["gold_mode"], "green-value" if result["gold_mode"] == "gold_accumulate" else "orange-value"),
         ("GC=F 状态", format_gold_signal(signals["GC=F"]), "gold-value"),
@@ -1376,21 +1412,57 @@ def build_tactical_allocation_display(decision: dict, private_mode: bool) -> pd.
 
     rows = []
     for fund_name, amount in decision["fund_allocation"].items():
-        rows.append(
-            {
-                "\u57fa\u91d1": fund_name,
-                "\u4eca\u65e5\u5efa\u8bae": f"\u00a5{amount}",
-            }
-        )
+        if private_mode:
+            rows.append({"基金": fund_name, "今日建议": f"¥{amount}"})
+        else:
+            rows.append({"基金": fund_name, "主题": public_fund_theme_label(fund_name), "组合角色": public_fund_role_label(fund_name), "今日状态": "维持 / 观察", "说明": "隐藏金额，仅展示方向"})
     gold_action = decision.get("gold_action")
-    if gold_action:
-        rows.append({"\u57fa\u91d1": "\u9ec4\u91d1", "\u4eca\u65e5\u5efa\u8bae": gold_action})
+    if gold_action and private_mode:
+        rows.append({"基金": "黄金", "今日建议": gold_action})
+    elif gold_action:
+        rows.append({"基金": "黄金", "主题": "防守缓冲", "组合角色": "两周计划观察", "今日状态": "按计划观察", "说明": "不展示补仓金额"})
     return pd.DataFrame(rows)
+
+
+def public_fund_theme_label(fund_name: str) -> str:
+    """Return public-safe theme label for allocation rows."""
+
+    text = str(fund_name)
+    if "纳指" in text or "纳斯达克" in text:
+        return "纳指底盘"
+    if "国富" in text:
+        return "科技互联观察"
+    if "成长" in text:
+        return "全球成长观察"
+    if "浦银" in text or "智能科技" in text:
+        return "智能科技观察"
+    if "标普" in text:
+        return "全球宽基观察"
+    if "日经" in text:
+        return "暂停观察"
+    return "主题观察"
+
+
+def public_fund_role_label(fund_name: str) -> str:
+    """Return public-safe role label for allocation rows."""
+
+    text = str(fund_name)
+    if "纳指" in text or "纳斯达克" in text:
+        return "科技核心"
+    if "黄金" in text:
+        return "防守缓冲"
+    if "标普" in text:
+        return "宽基底仓"
+    if "日经" in text:
+        return "观察"
+    return "主线观察"
 
 
 def build_allocation_summary_text(decision: dict, private_mode: bool) -> str:
     """Return a short allocation summary for compact cards."""
 
+    if not private_mode:
+        return "隐藏金额，仅展示方向"
     parts = [f"{name} \u00a5{amount}" for name, amount in decision["fund_allocation"].items()]
     return " / ".join(parts)
 
@@ -1579,8 +1651,8 @@ def calculate_dashboard_metrics(
 
     return {
         "total_amount": mask_sensitive_value(total) if is_public_mode(app_mode) else format_currency(total),
-        "daily_dca": format_currency(daily_dca),
-        "tactical_cash": mask_sensitive_value(tactical_cash) if is_public_mode(app_mode) else format_currency(tactical_cash),
+        "daily_dca": "按计划执行" if is_public_mode(app_mode) else format_currency(daily_dca),
+        "tactical_cash": "不展示金额" if is_public_mode(app_mode) else format_currency(tactical_cash),
         "gold_weight": format_percent_plain(gold_weight),
         "high_vol_weight": format_percent_plain(high_vol_weight),
         "drawdown_risk": format_percent_plain(drawdown),
@@ -2113,6 +2185,11 @@ def render_dca_decision_page(final_decision: dict, app_mode: dict) -> None:
 
     st.subheader("\u6bcf\u65e5\u5b9a\u6295\u51b3\u7b56")
     private_mode = is_private_mode(app_mode)
+    if not private_mode:
+        render_public_dca_decision_page(final_decision)
+        render_final_decision_plain_language(final_decision, app_mode)
+        st.caption("Public 模式隐藏所有具体执行金额；以上仅展示方向、纪律和状态。")
+        return
     amount_text = f"\u00a5{final_decision['daily_dca_amount']}"
     cash_amount = final_decision.get("tactical_cash_amount", 0)
     cash_text = f"\u00a5{cash_amount:,.0f}" if private_mode or cash_amount == 0 else "\u91d1\u989d\u5df2\u9690\u85cf"
@@ -2138,11 +2215,29 @@ def render_dca_decision_page(final_decision: dict, app_mode: dict) -> None:
     st.caption("\u4ee5\u4e0a\u4e3a final_decision \u7edf\u4e00\u540e\u7684\u5b9a\u6295\u8f85\u52a9\u548c\u98ce\u9669\u63d0\u793a\uff1b\u4e0d\u6784\u6210\u6295\u8d44\u5efa\u8bae\uff0c\u4e0d\u81ea\u52a8\u4ea4\u6613\u3002")
 
 
+def render_public_dca_decision_page(final_decision: dict) -> None:
+    """Render public-safe DCA decision without any execution amounts."""
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("今日模式", final_decision["market_mode"])
+    col2.metric("基础定投", "按计划执行")
+    col3.metric("灵活资金", "不动用" if not final_decision["use_tactical_cash"] else "等待机会")
+    st.markdown(f"**执行纪律：** {mask_amounts_in_text(final_decision['risk_discipline'])}")
+    st.markdown(f"**灵活资金说明：** {mask_amounts_in_text(final_decision['cash_explanation'])}")
+    st.markdown("**今日基金分配**")
+    st.dataframe(build_tactical_allocation_display(final_decision, private_mode=False), use_container_width=True, hide_index=True)
+
+
 def render_tactical_cash_page(final_decision: dict, app_mode: dict) -> None:
     """Render tactical cash usage page from final_decision only."""
 
     st.subheader("\u673a\u52a8\u8d44\u91d1\u4f7f\u7528\u5efa\u8bae")
     private_mode = is_private_mode(app_mode)
+    if not private_mode:
+        st.info(f"专业判断：是否使用灵活资金：{'是' if final_decision['use_tactical_cash'] else '否'}。Public 模式不展示金额。")
+        st.write(mask_amounts_in_text(final_decision["cash_explanation"]))
+        st.write("对我今天的动作：按系统纪律执行，不展示具体金额。")
+        return
     if final_decision["use_tactical_cash"]:
         amount = f"\u00a5{final_decision['tactical_cash_amount']:,.0f}" if private_mode else "\u91d1\u989d\u5df2\u9690\u85cf"
         st.success(f"\u4e13\u4e1a\u5224\u65ad\uff1a\u662f\u5426\u4f7f\u7528\u673a\u52a8\u8d44\u91d1\uff1a\u662f\u3002\u5efa\u8bae\u91d1\u989d\uff1a{amount}")
@@ -2168,12 +2263,16 @@ def render_final_decision_plain_language(final_decision: dict, app_mode: dict) -
     else:
         cash_action = "这笔钱留给大回撤或高赔率机会，今天不动用。"
         today_action = f"维持基础定投 ¥{final_decision['daily_dca_amount']}，不动用灵活资金。"
+    if is_public_mode(app_mode):
+        amount = "按计划执行"
+        cash_action = mask_amounts_in_text(cash_action)
+        today_action = "按系统纪律执行，不展示具体金额。"
 
     cards = [
         {
             "专业判断": f"今日模式：{final_decision['market_mode']}",
             "人话解释": final_decision["top_summary"],
-            "对我今天的动作": f"执行 {amount}，{final_decision['risk_discipline']}。",
+            "对我今天的动作": public_text(f"执行 {amount}，{final_decision['risk_discipline']}。", app_mode),
         },
         {
             "专业判断": f"是否使用机动资金：{'是' if final_decision['use_tactical_cash'] else '否'}",
@@ -2514,31 +2613,74 @@ def render_fund_monitor_page(portfolio: dict, final_decision: dict, app_mode: di
 
 
 def render_public_fund_monitor_page(funds: pd.DataFrame, final_decision: dict) -> None:
-    """Render public-safe fund structure and reference-market monitor."""
+    """Render public-safe fund NAV and reference-market monitor."""
 
-    st.info("公网版不展示真实基金净值，仅展示模型结构和公开市场参考。参考市场不等于基金当日真实涨跌。")
+    st.info("公网不展示真实持仓金额和账户数据；基金净值、日涨跌幅和申购状态属于公开数据，若接口可用则正常展示。参考市场仅用于理解方向，不等于基金真实涨跌。")
     proxy_symbols = sorted({symbol for _, fund in funds.iterrows() for symbol in fund_proxy_basket(fund)})
     proxy_data = load_chart_market_data(proxy_symbols, "1y") if proxy_symbols else {}
+    nav_cache = load_or_fetch_fund_navs(funds)
+    trade_rules = load_yaml(FUND_TRADE_RULES_PATH).get("fund_trade_rules", {})
+    overview_rows = []
     rows = []
     for _, fund in funds.iterrows():
         basket = fund_proxy_basket(fund)
         signal = aggregate_fund_proxy_signal(basket, proxy_data)
+        nav = find_fund_nav_record(fund, nav_cache)
+        trade_rule = match_trade_rule(fund, trade_rules)
+        data_quality = classify_fund_nav_quality(nav, signal)
+        daily_return = parse_numeric_amount(nav.get("daily_return"))
+        nav_value = parse_numeric_amount(nav.get("nav"))
+        overview_rows.append({"基金名称": fund.get("fund_name", ""), "daily_return": daily_return, "data_quality": data_quality})
         rows.append(
             {
                 "基金名称": fund.get("fund_name", ""),
+                "基金代码": normalize_fund_code(fund.get("fund_code", "")) or normalize_fund_code(nav.get("fund_code", "")) or "基金代码缺失",
                 "主题": fund.get("theme", ""),
                 "目标占比": format_percent_plain(parse_numeric_amount(fund.get("target_weight"))),
-                "风险等级": fund.get("risk_level", ""),
-                "组合角色": fund.get("role_in_portfolio", ""),
+                "最新净值日期": format_nav_date(nav.get("nav_date", "")),
+                "最新单位净值": format_nav_value(nav_value),
+                "基金真实日涨跌幅": format_percent_plain(daily_return) if daily_return is not None and pd.notna(daily_return) else "N/A",
+                "申购状态 / 限购状态": public_trade_status(format_purchase_status(nav, trade_rule)),
                 "参考市场": " / ".join(signal["used_symbols"]) if signal["used_symbols"] else "missing",
                 "参考市场今日涨跌": format_percent_plain(signal["today_return"]) if signal["today_return"] is not None else "数据不足",
                 "参考市场 RSI": f"{signal['rsi']:.1f}" if signal["rsi"] is not None else "数据不足",
-                "数据说明": "public demo / 无真实净值",
+                "数据质量": data_quality,
                 "今日动作说明": "不生成买入金额；最终动作仍读取 final_decision。",
             }
         )
+    render_public_fund_monitor_overview(pd.DataFrame(overview_rows))
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    st.caption(f"当前 public 展示模式：{final_decision.get('market_mode', 'unknown')}。不显示真实金额、基金净值、机动资金或账户数据。")
+    st.caption(f"当前 public 展示模式：{final_decision.get('market_mode', 'unknown')}。不显示真实持仓金额、每日买入金额、机动资金或账户数据。")
+
+
+def render_public_fund_monitor_overview(monitor: pd.DataFrame) -> None:
+    """Render public fund NAV overview without private amounts."""
+
+    if monitor.empty:
+        return
+    valid = monitor.dropna(subset=["daily_return"]).copy()
+    updated_count = int(len(valid))
+    pending_count = int(len(monitor) - updated_count)
+    average_return = valid["daily_return"].mean() if not valid.empty else None
+    best = valid.loc[valid["daily_return"].idxmax(), "基金名称"] if not valid.empty else "N/A"
+    worst = valid.loc[valid["daily_return"].idxmin(), "基金名称"] if not valid.empty else "N/A"
+    cols = st.columns(5)
+    cols[0].metric("已更新基金数量", updated_count)
+    cols[1].metric("待更新基金数量", pending_count)
+    cols[2].metric("今日基金平均涨跌", format_percent_plain(average_return) if average_return is not None else "N/A")
+    cols[3].metric("今日涨幅最大基金", best)
+    cols[4].metric("今日跌幅最大基金", worst)
+    if pending_count:
+        st.warning("部分基金净值尚未公布或接口不可用，暂不计算完整组合涨跌。")
+
+
+def public_trade_status(status: str) -> str:
+    """Hide purchase-limit amounts while keeping public buyability status."""
+
+    text = str(status or "申购状态未知")
+    text = re.sub(r"限购\s*[\d,.]+", "限购额度已隐藏", text)
+    text = re.sub(r"单日限购\s*[\d,.]+", "单日限购额度已隐藏", text)
+    return mask_amounts_in_text(text)
 
 
 def load_or_fetch_fund_navs(funds: pd.DataFrame) -> pd.DataFrame:
@@ -3080,7 +3222,7 @@ def render_theme_research_page(
     proxy_symbols = sorted({symbol for config in configs for symbol in config.get("proxy_basket", [])})
     theme_market_data = load_chart_market_data(proxy_symbols, "1y") if proxy_symbols else {}
     states = [build_theme_research_state(config, portfolio, asset_table, news_items, app_mode, theme_market_data) for config in configs]
-    render_theme_research_overview(states, final_decision)
+    render_theme_research_overview(states, final_decision, app_mode)
 
     strongest_name = max(states, key=lambda item: item["average_score"])["name"] if states else ""
     for state in states:
@@ -3521,7 +3663,7 @@ def build_fund_mapping_debug(portfolio: dict, configs: list[dict]) -> pd.DataFra
     return pd.DataFrame(rows)
 
 
-def render_theme_research_overview(states: list[dict], final_decision: dict) -> None:
+def render_theme_research_overview(states: list[dict], final_decision: dict, app_mode: dict) -> None:
     """Render top overview for theme research."""
 
     if not states:
@@ -3537,10 +3679,10 @@ def render_theme_research_overview(states: list[dict], final_decision: dict) -> 
     cols[2].metric("观察池主题", format_list_text(watchlist[:2]))
     cols[3].metric("当前防守主题", format_list_text(defense))
     cols[4].metric("是否改变 final_decision", "否")
-    st.info(
+    st.info(public_text(
         f"当前 final_decision 为 {final_decision.get('market_mode', 'unknown')}，今日金额仍为 ¥{final_decision.get('daily_dca_amount', 60)}。"
         "行业研究不能覆盖 do_not_chase / defense_mode，也不生成买入金额。"
-    )
+    , app_mode))
 
 
 def render_theme_research_card(state: dict, final_decision: dict, app_mode: dict) -> None:
@@ -3591,7 +3733,7 @@ def render_theme_research_card(state: dict, final_decision: dict, app_mode: dict
         st.caption("新闻数据不足或暂无高相关资讯，使用默认研究框架。")
 
     st.markdown("**对今日动作的影响**")
-    st.write(theme_today_action_text(state, final_decision))
+    st.write(public_text(theme_today_action_text(state, final_decision), app_mode))
 
 
 def format_theme_signal_value(value, percent: bool = False) -> str:
@@ -4281,7 +4423,7 @@ def render_news_digest_page(news_text: str, news_items: pd.DataFrame, app_mode: 
             st.caption(f"新闻抓取/发布时间参考：{latest_time}")
 
     st.markdown("#### 今日新闻总判断")
-    st.info(build_news_overall_judgment(news_items, final_decision))
+    st.info(public_text(build_news_overall_judgment(news_items, final_decision), app_mode))
     render_news_cards(news_items, app_mode, final_decision)
 
     with st.expander("原始 Markdown 摘要", expanded=False):
@@ -4397,7 +4539,7 @@ def build_news_card(item: pd.Series, app_mode: dict, final_decision: dict) -> di
         "news_type": context.get("catalyst_type", "软信号"),
         "labels": "、".join(labels),
         "watchlist": build_news_watchlist(context["watchlist"], labels),
-        "today_action": translate_news_action(labels, themes, final_decision),
+        "today_action": public_text(translate_news_action(labels, themes, final_decision), app_mode),
         "follow_up": build_news_follow_up(labels, context["watchlist"]),
     }
 
@@ -4916,10 +5058,10 @@ def render_news_dca_impact_page(news_text: str, app_mode: dict, final_decision: 
         "健康回踩定义：回撤 5%–10%，RSI 45–60，价格未明显跌破60日均线。"
     )
     card_cols[2].markdown(
-        "**黄金动作**\n\n黄金不纳入每日 ¥60 固定定投；按两周计划择时补仓。"
-        "默认 ¥60，回调明显 ¥90–105，过热或趋势弱 ¥30 或暂停。"
+        "**黄金动作**\n\n黄金按两周计划择时观察。"
+        "Public 模式不展示具体补仓金额。"
     )
-    st.caption(f"当前最终模式：{final_decision['market_mode']}；执行纪律：{final_decision['risk_discipline']}")
+    st.caption(f"当前最终模式：{final_decision['market_mode']}；执行纪律：{public_text(final_decision['risk_discipline'], app_mode)}")
     st.warning("新闻只作为辅助信号，不能覆盖 do_not_chase / defense_mode；不触发自动买入、卖出或券商账户操作。")
     return
 
@@ -4929,6 +5071,15 @@ def news_final_conclusion(final_decision: dict, app_mode: dict) -> str:
 
     mode = final_decision["market_mode"]
     amount = f"¥{final_decision['daily_dca_amount']}"
+    if is_public_mode(app_mode):
+        conclusions = {
+            "do_not_chase": "今日结论：新闻偏积极，但短线存在过热信号；按系统纪律执行，不追高，不展示金额。",
+            "normal_dca": "今日结论：新闻仅作为辅助，按系统纪律执行，不展示金额。",
+            "healthy_pullback": "今日结论：新闻与健康回踩共振时可按规则提高节奏，但不展示金额。",
+            "strong_opportunity": "今日结论：新闻与回撤机会共振时可提示分批观察，但不展示金额。",
+            "defense_mode": "今日结论：市场处于防守状态，新闻利好不触发加速。",
+        }
+        return conclusions.get(mode, conclusions["normal_dca"])
     conclusions = {
         "do_not_chase": f"今日结论：新闻偏积极，但短线存在过热信号；维持基础定投 {amount}，不加到 ¥100，不动用灵活资金。",
         "normal_dca": f"今日结论：新闻仅作为辅助，维持基础定投 {amount}。",

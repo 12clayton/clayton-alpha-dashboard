@@ -31,6 +31,7 @@ def get_latest_fund_navs_for_funds(
     funds: pd.DataFrame,
     cache_path: Path,
     aliases_path: Path | None = None,
+    manual_nav_path: Path | None = None,
 ) -> pd.DataFrame:
     """Fetch latest real NAV rows for all configured funds."""
 
@@ -40,7 +41,7 @@ def get_latest_fund_navs_for_funds(
         fund_dict = fund.to_dict()
         code = resolve_fund_code(fund_dict, aliases)
         name = str(fund_dict.get("fund_name", ""))
-        rows.append(get_latest_fund_nav(code, name, cache_path))
+        rows.append(get_latest_fund_nav(code, name, cache_path, manual_nav_path))
     return pd.DataFrame(rows, columns=NAV_COLUMNS)
 
 
@@ -48,6 +49,7 @@ def update_fund_nav_cache(
     portfolio_path: Path,
     cache_path: Path,
     aliases_path: Path | None = None,
+    manual_nav_path: Path | None = None,
 ) -> pd.DataFrame:
     """Update local NAV cache for all funds in portfolio.yaml."""
 
@@ -55,10 +57,10 @@ def update_fund_nav_cache(
     funds = pd.DataFrame(portfolio.get("funds", []))
     if funds.empty:
         return pd.DataFrame(columns=NAV_COLUMNS)
-    return get_latest_fund_navs_for_funds(funds, cache_path, aliases_path)
+    return get_latest_fund_navs_for_funds(funds, cache_path, aliases_path, manual_nav_path)
 
 
-def get_latest_fund_nav(fund_code: str, fund_name: str, cache_path: Path) -> dict[str, Any]:
+def get_latest_fund_nav(fund_code: str, fund_name: str, cache_path: Path, manual_nav_path: Path | None = None) -> dict[str, Any]:
     """Get one latest NAV row from AKShare, Eastmoney, then local cache."""
 
     code = normalize_fund_code(fund_code)
@@ -71,10 +73,49 @@ def get_latest_fund_nav(fund_code: str, fund_name: str, cache_path: Path) -> dic
             upsert_nav_cache(cache_path, row)
             return row
 
+    manual = find_manual_nav(manual_nav_path or cache_path.parent / "fund_manual_nav.csv", code)
+    if manual is not None:
+        return manual
+
     cached = find_cached_nav(cache_path, code)
     if cached is not None:
         return cached
     return missing_nav_row(code, fund_name, "missing_nav", "缓存缺失")
+
+
+def find_manual_nav(manual_nav_path: Path, fund_code: str) -> dict[str, Any] | None:
+    """Read manually maintained public NAV data when online providers fail."""
+
+    if not manual_nav_path.exists():
+        return None
+    try:
+        frame = pd.read_csv(manual_nav_path, dtype={"fund_code": str}, encoding="utf-8-sig")
+    except Exception:
+        return None
+    if frame.empty or "fund_code" not in frame.columns:
+        return None
+    code = normalize_fund_code(fund_code)
+    matched = frame.loc[frame["fund_code"].astype(str).map(normalize_fund_code) == code].copy()
+    if matched.empty:
+        return None
+    if "nav_date" in matched.columns:
+        matched["_sort_date"] = pd.to_datetime(matched["nav_date"], errors="coerce")
+        matched = matched.sort_values("_sort_date", ascending=False)
+    row = matched.iloc[0].drop(labels=["_sort_date"], errors="ignore").to_dict()
+    normalized = {
+        "fund_code": code,
+        "fund_name": row.get("fund_name", ""),
+        "nav_date": normalize_date_text(row.get("nav_date", "")),
+        "nav": parse_number(row.get("nav", "")),
+        "daily_return": parse_percent(row.get("daily_return", "")),
+        "purchase_status": safe_text(row.get("purchase_status", "")) or "未知",
+        "redemption_status": safe_text(row.get("redemption_status", "")) or "未知",
+        "data_source": row.get("data_source", "manual_nav"),
+        "data_quality": "manual_nav",
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "error_message": "手动净值可用",
+    }
+    return ensure_nav_columns(normalized)
 
 
 def fetch_nav_from_akshare(fund_code: str, fund_name: str) -> dict[str, Any]:
