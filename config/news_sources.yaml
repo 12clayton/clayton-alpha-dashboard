@@ -1,0 +1,96 @@
+# 新闻源配置。抓取失败时会记录到 logs/news_digest_YYYY-MM-DD.log，不会中断主流程。
+sources:
+  - source_name: Yahoo Finance - Technology
+    source_type: rss
+    url: https://feeds.finance.yahoo.com/rss/2.0/headline?s=QQQ,SPY,NVDA,AMD,AVGO,TSM,ASML,BTC-USD,GLD&region=US&lang=en-US
+    language: en
+    enabled: true
+    themes:
+      - semiconductor
+      - crypto
+      - gold
+      - macro
+
+  - source_name: CNBC - Top News
+    source_type: rss
+    url: https://www.cnbc.com/id/100003114/device/rss/rss.html
+    language: en
+    enabled: true
+    themes:
+      - macro
+      - semiconductor
+
+  - source_name: MarketWatch - MarketPulse
+    source_type: rss
+    url: https://feeds.marketwatch.com/marketwatch/marketpulse/
+    language: en
+    enabled: true
+    themes:
+      - macro
+      - gold
+
+  - source_name: Investing.com - Stock Market News
+    source_type: rss
+    url: https://www.investing.com/rss/news_25.rss
+    language: en
+    enabled: true
+    themes:
+      - macro
+      - semiconductor
+
+  - source_name: Reuters - Business
+    source_type: rss
+    url: https://feeds.reuters.com/reuters/businessNews
+    language: en
+    enabled: true
+    themes:
+      - macro
+      - semiconductor
+
+  - source_name: Federal Reserve - Press Releases
+    source_type: rss
+    url: https://www.federalreserve.gov/feeds/press_all.xml
+    language: en
+    enabled: true
+    themes:
+      - macro
+
+  - source_name: US Treasury - Press Releases
+    source_type: rss
+    url: https://home.treasury.gov/news/press-releases/rss
+    language: en
+    enabled: true
+    themes:
+      - macro
+
+  - source_name: FRED Blog
+    source_type: rss
+    url: https://fredblog.stlouisfed.org/feed/
+    language: en
+    enabled: true
+    themes:
+      - macro
+
+  - source_name: Google News - CPO Optical Modules
+    source_type: rss
+    url: https://news.google.com/rss/search?q=%22co-packaged%20optics%22%20OR%20%22optical%20module%22%20OR%20800G%20OR%201.6T%20when:1d&hl=en-US&gl=US&ceid=US:en
+    language: en
+    enabled: true
+    themes:
+      - cpo
+
+  - source_name: Google News - Silicon Carbide
+    source_type: rss
+    url: https://news.google.com/rss/search?q=%22silicon%20carbide%22%20OR%20SiC%20OR%20Wolfspeed%20OR%20Infineon%20OR%20%22ON%20Semiconductor%22%20when:1d&hl=en-US&gl=US&ceid=US:en
+    language: en
+    enabled: true
+    themes:
+      - sic
+
+  - source_name: Manual QDII Premium Notes
+    source_type: manual
+    url: config/qdii_premium.csv
+    language: zh
+    enabled: true
+    themes:
+      - qdii

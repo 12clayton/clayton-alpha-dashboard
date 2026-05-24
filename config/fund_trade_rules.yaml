@@ -1,0 +1,20 @@
+fund_trade_rules:
+  浦银全球智能科技:
+    buyable: false
+    daily_limit: 0
+    note: 当前暂不可购买
+  国富全球科技互联:
+    buyable: true
+    daily_limit: 100
+    note: 单日限购 100
+  易方达全球成长:
+    buyable: true
+    daily_limit: 20
+    share_classes:
+    - A
+    - C
+    note: 单日限购 20，注意 A/C 类份额差异
+  易方达黄金:
+    buyable: true
+    daily_limit: null
+    note: 黄金按两周计划补仓，不纳入每日基础定投

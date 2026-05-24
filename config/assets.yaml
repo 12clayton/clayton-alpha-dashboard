@@ -1,0 +1,82 @@
+# 这里配置需要监控的资产清单。
+# symbol 使用 Yahoo Finance 代码；name 和 theme 用于报告展示。
+assets:
+  - symbol: SPY
+    name: 标普500 ETF
+    theme: 全球股票
+    role: 风险资产核心观察
+
+  - symbol: QQQ
+    name: 纳斯达克100 ETF
+    theme: 美股科技 / QDII 代理
+    role: 科技成长风险偏好
+
+  - symbol: ACWI
+    name: MSCI 全球股票 ETF
+    theme: 全球资产
+    role: 全球权益总览
+
+  - symbol: GLD
+    name: SPDR Gold ETF
+    theme: 黄金
+    role: 黄金ETF趋势代理
+
+  - symbol: GC=F
+    name: COMEX Gold Futures
+    theme: 黄金
+    role: 黄金期货价格温度计
+
+  - symbol: UUP
+    name: 美元指数 ETF
+    theme: 美元
+    role: 美元强弱代理
+
+  - symbol: TLT
+    name: 长期美债 ETF
+    theme: 美债
+    role: 利率/防守资产代理
+
+  - symbol: DFII10
+    name: 美国10年期实际利率
+    theme: 实际利率
+    role: 判断黄金宏观压力
+    source: FRED
+
+  - symbol: SOXX
+    name: 半导体 ETF
+    theme: 半导体
+    role: AI 硬件链风险偏好
+
+  - symbol: SMH
+    name: VanEck 半导体 ETF
+    theme: 半导体 / AI 算力
+    role: AI 算力核心资产代理
+
+  - symbol: BOTZ
+    name: 机器人与 AI ETF
+    theme: AI 算力
+    role: AI 主题热度观察
+
+  - symbol: BTC-USD
+    name: 比特币
+    theme: 加密资产
+    role: 高波动风险偏好观察
+
+  - symbol: 513100.SS
+    name: 纳指 ETF QDII
+    theme: QDII 基金
+    role: 境内 QDII 价格代理
+
+  - symbol: 513500.SS
+    name: 标普500 ETF QDII
+    theme: QDII 基金
+    role: 境内 QDII 价格代理
+
+# 风险模型参数，可按自己的研究偏好调整。
+risk_rules:
+  short_ma_window: 20
+  long_ma_window: 60
+  rsi_window: 14
+  risk_off_drawdown: -0.15
+  overheated_rsi: 70
+  weak_rsi: 40

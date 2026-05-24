@@ -1,0 +1,81 @@
+macro:
+  - Federal Reserve
+  - Fed
+  - interest rates
+  - rate cut
+  - rate hike
+  - treasury yields
+  - 10-year yield
+  - US dollar
+  - DXY
+  - CPI
+  - PCE
+  - inflation
+  - liquidity
+
+semiconductor:
+  - semiconductor
+  - chip
+  - Nvidia
+  - Broadcom
+  - TSMC
+  - AMD
+  - ASML
+  - AI chip
+  - GPU
+  - ASIC
+  - memory
+  - HBM
+
+cpo:
+  - CPO
+  - co-packaged optics
+  - optical module
+  - optical interconnect
+  - 800G
+  - 1.6T
+  - data center interconnect
+  - silicon photonics
+
+cpu:
+  - CPU
+  - server CPU
+  - Intel
+  - AMD
+  - Arm
+  - x86
+  - data center CPU
+
+gold:
+  - gold
+  - GLD
+  - central bank gold
+  - real yields
+  - safe haven
+  - dollar weakness
+
+sic:
+  - silicon carbide
+  - SiC
+  - Wolfspeed
+  - ON Semiconductor
+  - STMicroelectronics
+  - Infineon
+  - power semiconductor
+  - EV inverter
+
+crypto:
+  - Bitcoin
+  - BTC
+  - crypto ETF
+  - stablecoin
+  - digital asset
+
+qdii:
+  - QDII
+  - premium
+  - discount
+  - NAV
+  - RMB
+  - USD/CNY
+  - exchange rate

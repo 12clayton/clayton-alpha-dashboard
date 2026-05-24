@@ -1,0 +1,56 @@
+__pycache__/
+*.py[cod]
+daily_report*.xlsx
+.venv/
+venv/
+.env
+*.env
+.streamlit/secrets.toml
+*.pyc
+data/fund_manual_nav.csv
+data/fund_nav_cache.csv
+reports/execution_review.csv
+backups/
+*.log
+.DS_Store
+config/portfolio.yaml
+config/dca_policy.yaml
+# private configs
+config/portfolio.yaml
+config/dca_policy.yaml
+.env
+*.env
+.streamlit/secrets.toml
+
+# private data / caches
+data/
+data_cache.csv
+data_cache/
+data/fund_nav_cache.csv
+data/fund_manual_nav.csv
+reports/
+backups/
+logs/
+notebooks/
+
+# private holding exports
+holdings.csv
+portfolio.csv
+auto_invest_plan.csv
+target_allocation.csv
+
+# python cache
+__pycache__/
+*.pyc
+
+# system
+.DS_Store
+*.log
+# local/private runtime configs
+config/app_mode.yaml
+config/gold_replenishment.yaml
+config/qdii_premium.csv
+config/user_profile.yaml
+
+# suspicious local file/folder, do not upload
+python
