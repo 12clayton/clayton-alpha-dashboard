@@ -31,6 +31,7 @@ from src.public_data_loader import (
     load_public_ohlc_data,
     load_public_market_snapshot,
 )
+from src.public_news_loader import load_public_news
 
 
 ROOT_DIR = Path(__file__).parent
@@ -44,6 +45,8 @@ GOLD_REPLENISHMENT_PATH = ROOT_DIR / "config" / "gold_replenishment.yaml"
 FUND_TRADE_RULES_PATH = ROOT_DIR / "config" / "fund_trade_rules.yaml"
 FUND_NAV_CACHE_PATH = ROOT_DIR / "data" / "fund_nav_cache.csv"
 FUND_CODE_ALIASES_PATH = ROOT_DIR / "config" / "fund_code_aliases.yaml"
+NEWS_SOURCES_PATH = ROOT_DIR / "config" / "news_sources.yaml"
+PUBLIC_NEWS_CACHE_PATH = ROOT_DIR / "data" / "public_news_cache.json"
 BACKUPS_DIR = ROOT_DIR / "backups"
 EXECUTION_REVIEW_PATH = REPORTS_DIR / "execution_review.csv"
 
@@ -80,10 +83,12 @@ def main() -> None:
         market_status = infer_public_market_status(public_snapshot)
         report_text = build_public_snapshot_report(asset_table, market_status)
         report_date = datetime.now().strftime("%Y-%m-%d")
-        news_text = "## 每日投资资讯摘要\n\n公网展示版暂未接入实时新闻缓存，新闻页展示研究框架。"
+        news_text = "## 每日投资资讯摘要\n\n公网新闻源暂不可用，新闻页保留研究框架。"
         news_csv = None
         dca_table = pd.DataFrame()
-        news_items = pd.DataFrame()
+        news_items = load_public_news(NEWS_SOURCES_PATH, PUBLIC_NEWS_CACHE_PATH)
+        if not news_items.empty:
+            news_text = build_public_news_text(news_items)
         using_public_fallback = True
     elif latest_report is None:
         st.warning("当前 reports 文件夹没有 daily risk report，请先运行：python main.py")
@@ -95,6 +100,10 @@ def main() -> None:
         asset_table = parse_asset_table(report_text)
         dca_table = parse_markdown_table(report_text, "基金")
         news_items = load_latest_news_items(news_csv, news_text)
+        if is_public_mode(app_mode) and news_items.empty:
+            news_items = load_public_news(NEWS_SOURCES_PATH, PUBLIC_NEWS_CACHE_PATH)
+            if not news_items.empty:
+                news_text = build_public_news_text(news_items)
     else:
         report_text = latest_report.read_text(encoding="utf-8")
         report_date = extract_report_date(latest_report, report_text)
@@ -211,6 +220,23 @@ def build_public_snapshot_report(asset_table: pd.DataFrame, market_status: str) 
             "公网展示版使用公开市场行情自动生成，仅用于模型展示和风险观察。",
         ]
     )
+    return "\n".join(lines)
+
+
+def build_public_news_text(news_items: pd.DataFrame) -> str:
+    """Build lightweight public news Markdown from RSS rows."""
+
+    lines = ["## 每日投资资讯摘要", "", "公网展示版使用公开 RSS 新闻源生成基础投研摘要。"]
+    if news_items.empty:
+        lines.append("公网新闻源暂不可用，保留研究框架。")
+        return "\n".join(lines)
+    lines.extend(["", "### 今日公开新闻源", ""])
+    for _, item in news_items.head(8).iterrows():
+        title = str(item.get("title", ""))
+        url = str(item.get("url", ""))
+        source = str(item.get("source", "RSS"))
+        themes = ", ".join(parse_news_themes(item.get("themes", [])))
+        lines.append(f"- [{title}]({url}) | 来源：{source} | 主题：{themes}")
     return "\n".join(lines)
 
 
@@ -3041,7 +3067,12 @@ def render_theme_research_page(
     st.subheader("行业研究 / Clayton Theme Research")
     st.caption("行业研究只判断主线、产业链机会、基金映射和观察池；不生成买入金额，最终金额仍由 final_decision 决定。")
     if news_items.empty:
-        st.warning("新闻数据不足，使用市场数据和默认框架。")
+        if is_public_mode(app_mode):
+            st.info("当前使用公开市场数据 + 默认行业框架；新闻源暂不可用时，不影响 final_decision。")
+        else:
+            st.warning("新闻数据不足，使用市场数据和默认框架。")
+    elif is_public_mode(app_mode):
+        st.info("当前使用公开市场数据 + 公开 RSS 新闻源增强主题状态；新闻不覆盖 final_decision，不生成买入金额。")
     if asset_table.empty:
         st.warning("市场数据暂不可用，主题状态会更偏保守。")
 
@@ -4239,7 +4270,7 @@ def render_news_digest_page(news_text: str, news_items: pd.DataFrame, app_mode: 
 
     st.subheader("新闻与主题观察")
     if is_public_mode(app_mode) and news_items.empty:
-        st.info("公网展示版暂未接入实时新闻缓存，新闻页展示研究框架。")
+        st.info("公网新闻源暂不可用，新闻页保留研究框架。")
     if not news_items.empty:
         col1, col2 = st.columns(2)
         col1.metric("新闻条数", len(news_items))
@@ -4581,6 +4612,8 @@ def build_news_content(title: str, summary: str, labels: list[str], context: dic
     """Write the first paragraph: what the news itself says."""
 
     if body_available:
+        if str(summary).startswith("正文不可用，仅基于标题判断"):
+            return shorten_text(summary, 260)
         return shorten_text(
             enrich_news_summary(summary, title, labels, context),
             260,
@@ -4837,7 +4870,7 @@ def render_news_radar_page(news_items: pd.DataFrame) -> None:
 
     st.subheader("主题新闻雷达")
     if news_items.empty:
-        st.info("暂无可解析的新闻条目。")
+        st.info("公网新闻源暂不可用，保留研究框架。")
         return
 
     exploded = news_items.explode("themes")
@@ -4857,7 +4890,7 @@ def render_theme_news_page(news_items: pd.DataFrame, themes: list[str], title: s
 
     st.subheader(title)
     if news_items.empty:
-        st.info("暂无可解析的新闻条目。")
+        st.info("公网新闻源暂不可用，保留研究框架。")
         return
 
     mask = news_items["themes"].map(lambda item_themes: any(theme in item_themes for theme in themes))
