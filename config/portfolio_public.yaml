@@ -53,8 +53,8 @@ funds:
     risk_level: medium
     role_in_portfolio: 防守缓冲
 
-  - fund_name: 华安日经225
-    fund_code: ""
+  - fund_name: 华安三菱日联日经225ETF发起式联接（QDII）A
+    fund_code: "020712"
     theme: 日本股票
     proxy_symbol: EWJ
     current_amount:
