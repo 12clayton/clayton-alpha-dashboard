@@ -9,7 +9,10 @@ venv/
 *.pyc
 data/fund_manual_nav.csv
 data/fund_nav_cache.csv
+data/
+data_cache.csv
 reports/execution_review.csv
+reports/
 backups/
 *.log
 .DS_Store

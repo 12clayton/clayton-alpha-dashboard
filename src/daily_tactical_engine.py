@@ -26,6 +26,7 @@ def daily_tactical_engine(inputs: TacticalInputs) -> dict:
     if _missing_core_data(inputs):
         return _build_result(
             market_mode="normal_dca",
+            risk_discipline="normal",
             daily_dca_amount=60,
             tactical_cash_action="不动用灵活加仓资金",
             gold_action="数据不足，执行基础定投；黄金按两周计划观察。",
@@ -44,6 +45,7 @@ def daily_tactical_engine(inputs: TacticalInputs) -> dict:
     if both_below_ma or risk_off:
         return _build_result(
             market_mode="defense_mode",
+            risk_discipline="defense_first",
             daily_dca_amount=60,
             tactical_cash_action="不动用灵活加仓资金",
             gold_action="黄金优先；成长股不加速。",
@@ -61,7 +63,8 @@ def daily_tactical_engine(inputs: TacticalInputs) -> dict:
 
     if qqq_hot or smh_hot or qqq_far_above or smh_far_above:
         return _build_result(
-            market_mode="do_not_chase",
+            market_mode="normal_dca",
+            risk_discipline="do_not_chase",
             daily_dca_amount=60,
             tactical_cash_action="不动用灵活加仓资金",
             gold_action="按两周计划择时补仓；默认 ¥60，回调明显 ¥90–105，过热时 ¥30 或暂停。",
@@ -82,6 +85,7 @@ def daily_tactical_engine(inputs: TacticalInputs) -> dict:
     if strong and trend_not_broken and not risk_off:
         return _build_result(
             market_mode="strong_opportunity",
+            risk_discipline="wait_for_pullback",
             daily_dca_amount=100,
             tactical_cash_action="可考虑使用灵活加仓资金的 10%–20%；分配：半导体/CPO/CPU 60%，纳指100 30%，黄金 10%。",
             gold_action="黄金保留 ¥10 防守补充。",
@@ -102,6 +106,7 @@ def daily_tactical_engine(inputs: TacticalInputs) -> dict:
     if healthy and trend_not_broken and not risk_off:
         return _build_result(
             market_mode="healthy_pullback",
+            risk_discipline="normal",
             daily_dca_amount=80,
             tactical_cash_action="不动用灵活加仓资金",
             gold_action="黄金补 ¥5，保持防守层。",
@@ -119,6 +124,7 @@ def daily_tactical_engine(inputs: TacticalInputs) -> dict:
 
     return _build_result(
         market_mode="normal_dca",
+        risk_discipline="normal",
         daily_dca_amount=60,
         tactical_cash_action="不动用灵活加仓资金",
         gold_action="黄金按两周计划择时，不每日固定。",
@@ -141,6 +147,7 @@ def _normal_allocation() -> dict[str, int]:
 
 def _build_result(
     market_mode: str,
+    risk_discipline: str,
     daily_dca_amount: int,
     tactical_cash_action: str,
     gold_action: str,
@@ -149,6 +156,7 @@ def _build_result(
 ) -> dict:
     return {
         "market_mode": market_mode,
+        "risk_discipline": risk_discipline,
         "daily_dca_amount": daily_dca_amount,
         "tactical_cash_action": tactical_cash_action,
         "gold_action": gold_action,
