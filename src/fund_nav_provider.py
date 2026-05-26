@@ -15,6 +15,8 @@ import yaml
 NAV_COLUMNS = [
     "fund_code",
     "fund_name",
+    "normalized_name",
+    "fund_code_source",
     "nav_date",
     "nav",
     "daily_return",
@@ -39,9 +41,12 @@ def get_latest_fund_navs_for_funds(
     rows = []
     for _, fund in funds.iterrows():
         fund_dict = fund.to_dict()
-        code = resolve_fund_code(fund_dict, aliases)
+        code, code_source = resolve_fund_code_with_source(fund_dict, aliases)
         name = str(fund_dict.get("fund_name", ""))
-        rows.append(get_latest_fund_nav(code, name, cache_path, manual_nav_path))
+        row = get_latest_fund_nav(code, name, cache_path, manual_nav_path)
+        row["fund_code_source"] = code_source
+        row["normalized_name"] = normalize_fund_name(name)
+        rows.append(ensure_nav_columns(row))
     return pd.DataFrame(rows, columns=NAV_COLUMNS)
 
 
@@ -309,14 +314,27 @@ def load_fund_code_aliases(path: Path | None) -> dict[str, str]:
 def resolve_fund_code(fund: dict[str, Any], aliases: dict[str, str]) -> str:
     """Resolve fund code from portfolio first, then alias config."""
 
+    return resolve_fund_code_with_source(fund, aliases)[0]
+
+
+def resolve_fund_code_with_source(fund: dict[str, Any], aliases: dict[str, str]) -> tuple[str, str]:
+    """Resolve fund code with source: portfolio, alias, fuzzy, or missing."""
+
     direct = normalize_fund_code(fund.get("fund_code", ""))
     if direct:
-        return direct
+        return direct, "portfolio"
     name = normalize_fund_name(fund.get("fund_name", ""))
     for alias, code in aliases.items():
-        if normalize_fund_name(alias) and normalize_fund_name(alias) in name:
-            return normalize_fund_code(code)
-    return ""
+        alias_name = normalize_fund_name(alias)
+        normalized_code = normalize_fund_code(code)
+        if alias_name and normalized_code and alias_name == name:
+            return normalized_code, "alias"
+    for alias, code in aliases.items():
+        alias_name = normalize_fund_name(alias)
+        normalized_code = normalize_fund_code(code)
+        if alias_name and normalized_code and (alias_name in name or name in alias_name):
+            return normalized_code, "fuzzy"
+    return "", "missing"
 
 
 def normalize_fund_code(value: Any) -> str:
@@ -331,6 +349,15 @@ def normalize_fund_code(value: Any) -> str:
 
 def normalize_fund_name(value: Any) -> str:
     """Normalize fund name for alias matching."""
+
+    text = str(value or "").strip().lower()
+    text = text.replace("（", "(").replace("）", ")")
+    text = re.sub(r"\s+", "", text)
+    text = re.sub(r"\((qdii|lof)\)", "", text, flags=re.I)
+    for token in ["qdii", "联接", "混合", "股票", "基金", "etf", "lof", "a类", "c类"]:
+        text = text.replace(token, "")
+    text = re.sub(r"[ac]$", "", text)
+    return text
 
     text = str(value or "").strip().lower()
     text = text.replace("（", "(").replace("）", ")")

@@ -1,57 +1,63 @@
 funds:
-- fund_name: 摩根标普500(QDII)A
-  fund_code: ""
-  theme: 标普500
-  proxy_symbol: SPY
-  current_amount:
-  target_weight: 0.20
-  risk_level: medium
-  role_in_portfolio: 全球宽基底仓
-- fund_name: 广发纳斯达克100ETF联接(QDII)A
-  fund_code: ""
-  theme: 纳斯达克100
-  proxy_symbol: QQQ
-  current_amount:
-  target_weight: 0.18
-  risk_level: high
-  role_in_portfolio: 科技成长核心
-- fund_name: 易方达全球成长精选混合(QDII)A
-  fund_code: ""
-  theme: 全球成长
-  proxy_symbol: QQQ
-  current_amount:
-  target_weight: 0.16
-  risk_level: high
-  role_in_portfolio: 成长风格增强
-- fund_name: 国富全球科技互联混合(QDII)A
-  fund_code: ""
-  theme: CPO / CPU / 全球科技
-  proxy_symbol: QQQ
-  current_amount:
-  target_weight: 0.14
-  risk_level: high
-  role_in_portfolio: CPO / CPU 主题观察
-- fund_name: 浦银安盛全球智能科技股票(QDII)A
-  fund_code: ""
-  theme: 半导体 / AI 算力
-  proxy_symbol: SOXX
-  current_amount:
-  target_weight: 0.20
-  risk_level: very_high
-  role_in_portfolio: 半导体主攻方向
-- fund_name: 易方达黄金ETF联接A
-  fund_code: ""
-  theme: 黄金
-  proxy_symbol: GLD
-  current_amount:
-  target_weight: 0.10
-  risk_level: medium
-  role_in_portfolio: 防守缓冲
-- fund_name: 华安日经225
-  fund_code: ""
-  theme: 日本股票
-  proxy_symbol: EWJ
-  current_amount:
-  target_weight: 0.00
-  risk_level: medium
-  role_in_portfolio: 暂停观察
+  - fund_name: 摩根标普500(QDII)A
+    fund_code: "017641"
+    theme: 标普500
+    proxy_symbol: SPY
+    current_amount:
+    target_weight: 0.20
+    risk_level: medium
+    role_in_portfolio: 全球宽基底仓
+
+  - fund_name: 广发纳斯达克100ETF联接(QDII)A
+    fund_code: "270042"
+    theme: 纳斯达克100
+    proxy_symbol: QQQ
+    current_amount:
+    target_weight: 0.18
+    risk_level: high
+    role_in_portfolio: 科技成长核心
+
+  - fund_name: 易方达全球成长精选混合(QDII)A
+    fund_code: "012920"
+    theme: 全球成长
+    proxy_symbol: QQQ
+    current_amount:
+    target_weight: 0.16
+    risk_level: high
+    role_in_portfolio: 成长风格增强
+
+  - fund_name: 国富全球科技互联混合(QDII)A
+    fund_code: "006373"
+    theme: CPO / CPU / 全球科技
+    proxy_symbol: QQQ
+    current_amount:
+    target_weight: 0.14
+    risk_level: high
+    role_in_portfolio: CPO / CPU 主题观察
+
+  - fund_name: 浦银安盛全球智能科技股票(QDII)A
+    fund_code: "006555"
+    theme: 半导体 / AI 算力
+    proxy_symbol: SOXX
+    current_amount:
+    target_weight: 0.20
+    risk_level: very_high
+    role_in_portfolio: 半导体主攻方向
+
+  - fund_name: 易方达黄金ETF联接A
+    fund_code: "000307"
+    theme: 黄金
+    proxy_symbol: GLD
+    current_amount:
+    target_weight: 0.10
+    risk_level: medium
+    role_in_portfolio: 防守缓冲
+
+  - fund_name: 华安日经225
+    fund_code: ""
+    theme: 日本股票
+    proxy_symbol: EWJ
+    current_amount:
+    target_weight: 0.00
+    risk_level: medium
+    role_in_portfolio: 暂停观察
