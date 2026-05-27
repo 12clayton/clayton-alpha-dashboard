@@ -246,11 +246,12 @@ TREND_STAGE_LABELS_ZH = {
 }
 
 
-def render_industry_trend_search_page() -> None:
+def render_industry_trend_search_page(lang: str | None = None, show_language_picker: bool = True) -> None:
     """Render the industry trend search page."""
 
     _apply_industry_css()
-    lang = render_language_picker()
+    if show_language_picker or lang is None:
+        lang = render_language_picker()
     text = TEXT[lang]
 
     _render_html(

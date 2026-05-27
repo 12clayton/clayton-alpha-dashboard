@@ -231,6 +231,17 @@ INDUSTRY_MARKET_TICKERS = {
     },
 }
 
+EXPLICIT_NO_MARKET_MAPPING = {
+    "liquor",
+    "food_beverage",
+    "tourism",
+    "hotel",
+    "ai_healthcare",
+    "cement",
+    "ports",
+    "power_equipment",
+}
+
 
 @dataclass(frozen=True)
 class MarketDataResult:

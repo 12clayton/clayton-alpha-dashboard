@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
 if "streamlit" not in sys.modules:
     sys.modules["streamlit"] = types.SimpleNamespace(cache_data=lambda *args, **kwargs: (lambda func: func))
 
-from src.industry_market_data import INDUSTRY_MARKET_TICKERS
+from src.industry_market_data import EXPLICIT_NO_MARKET_MAPPING, INDUSTRY_MARKET_TICKERS
 from src.industry_trend_data import industryTrendData
 from src.industry_trend_search import normalize_industry_query
 
@@ -47,17 +47,6 @@ ENGLISH_RESIDUE_PATTERNS = [
     "Application Layer",
     "Component Suppliers",
 ]
-
-EXPLICIT_NO_MARKET_MAPPING = {
-    "liquor",
-    "food_beverage",
-    "tourism",
-    "hotel",
-    "ai_healthcare",
-    "cement",
-    "ports",
-    "power_equipment",
-}
 
 
 def main() -> int:
