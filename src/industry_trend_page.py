@@ -29,9 +29,13 @@ TEXT = {
         "live_title": "真实市场价格确认数据（V3 实时市场数据）",
         "live_intro": "该模块使用公开行情数据计算行业代表 ETF / 龙头股的趋势确认情况。它只反映市场价格层面，不代表完整产业基本面结论。",
         "price_score_note": "该分数仅基于公开行情数据计算，用于观察价格层面的趋势确认情况，不代表完整产业基本面结论。",
-        "live_unavailable": "实时市场确认数据暂不可用，当前仍展示 V1/V2 mock framework。",
+        "live_unavailable": "实时市场确认数据暂不可用，当前仍展示 V1/V2 模拟框架。",
+        "no_market_mapping": "当前行业尚未配置 V3 市场价格代理样本，因此暂不展示实时市场价格确认数据。当前仍展示 V1/V2 模拟框架。",
         "cpo_note": "CPO / Optical Module 暂无专用 ETF，本模块使用代表性公司作为价格代理样本。",
+        "cxo_proxy_note": "CXO 暂无专用 ETF，本模块使用生命科学服务与医药外包代表公司作为价格代理样本。",
+        "wind_power_proxy_note": "风电使用全球风电 ETF 与代表公司作为价格代理，部分 OTC ticker 可能不稳定。",
         "proxy_note": "当前行业使用代表性公司组合作为市场价格代理。",
+        "sic_proxy_note": "SiC 暂无专用 ETF，本模块使用代表性功率半导体公司作为价格代理样本。",
         "data_source": "数据源",
         "updated": "更新时间",
         "benchmark": "基准",
@@ -100,8 +104,12 @@ TEXT = {
         "live_intro": "This module uses public price data to calculate trend confirmation for representative ETFs and leading companies. It reflects market prices only, not a full fundamental industry conclusion.",
         "price_score_note": "This score is calculated from public price data only. It reflects market-price confirmation, not a full fundamental industry conclusion.",
         "live_unavailable": "Live market confirmation data is unavailable. The V1/V2 mock framework remains displayed.",
+        "no_market_mapping": "This industry does not yet have a configured V3 market-price proxy set. The page is currently showing the V1/V2 mock framework only.",
         "cpo_note": "CPO / Optical Module has no dedicated ETF for now, so this module uses representative companies as price proxy samples.",
+        "cxo_proxy_note": "CXO has no dedicated ETF for now, so this module uses representative life-science services and outsourcing companies as price proxy samples.",
+        "wind_power_proxy_note": "Wind power uses a global wind ETF and representative companies as price proxy samples. Some OTC tickers may be less stable.",
         "proxy_note": "This industry currently uses a representative company basket as a market-price proxy.",
+        "sic_proxy_note": "SiC has no dedicated ETF for now, so this module uses representative power-semiconductor companies as price proxy samples.",
         "data_source": "Data Source",
         "updated": "Updated",
         "benchmark": "Benchmark",
@@ -391,12 +399,17 @@ def render_live_market_confirmation(industry: dict, lang: str) -> None:
 
     result = get_market_confirmation_data(industry.get("id", ""))
     if not result.get("available"):
+        if result.get("reason_code") == "no_market_mapping":
+            st.info(text["no_market_mapping"])
+            return
         st.info(text["live_unavailable"])
         return
 
-    if industry.get("id") == "cpo_optical_module":
+    if result.get("proxy_note_key"):
+        st.info(text.get(result["proxy_note_key"], text["proxy_note"]))
+    elif industry.get("id") == "cpo_optical_module":
         st.info(text["cpo_note"])
-    elif not result.get("has_etf_sample"):
+    elif result.get("no_dedicated_etf") or not result.get("has_etf_sample"):
         st.info(text["proxy_note"])
 
     render_market_meta_strip(result, lang)
@@ -785,6 +798,8 @@ def translate_status(status: str, lang: str) -> str:
 def category_label(industry: dict, lang: str) -> str:
     """Return localized category label with a theme-specific refinement."""
 
+    if lang == "zh" and industry.get("categoryZh"):
+        return str(industry["categoryZh"])
     if lang == "zh" and industry.get("id") == "gold":
         return "贵金属"
     if lang == "en" and industry.get("id") == "gold":
@@ -797,7 +812,7 @@ def industry_category_path(industry: dict, lang: str) -> str:
 
     if lang == "zh":
         if industry.get("id") == "gold":
-            return f"{category_label({'category': industry.get('category', '')}, lang)} / 贵金属 / {industry_name(industry, lang)}"
+            return f"{CATEGORY_LABELS[lang].get(str(industry.get('category', '')), str(industry.get('category', '')))} / 贵金属 / {industry_name(industry, lang)}"
         return f"{category_label(industry, lang)} / {industry_name(industry, lang)}"
     if industry.get("id") == "gold":
         return f"{industry.get('category', '')} / Precious Metals / {industry_name(industry, lang)}"
@@ -903,6 +918,14 @@ def _apply_industry_css() -> None:
         <style>
         .block-container {
             padding-top: 2.5rem;
+        }
+        div[data-testid="stTextInput"] input {
+            border-color: rgba(148, 163, 184, 0.35) !important;
+            box-shadow: none !important;
+        }
+        div[data-testid="stTextInput"] input:focus {
+            border-color: rgba(56, 189, 248, 0.7) !important;
+            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25) !important;
         }
         .industry-hero {
             display: flex;

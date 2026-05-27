@@ -195,6 +195,14 @@ industryTrendData = [
     for item in items
 ]
 
+if not any(record["id"] == "healthcare" for record in industryTrendData):
+    industryTrendData.append(
+        _build_record(
+            ("healthcare", "Healthcare", "医药", ["healthcare", "medical", "pharma", "医药", "医疗"]),
+            "Healthcare",
+        )
+    )
+
 
 SEMICONDUCTOR_DETAIL = {
     "id": "semiconductor",
@@ -487,3 +495,479 @@ GENERIC_INDUSTRY_TEMPLATE.update(
         "riskSignalsZh": ["市场确认偏弱", "基本验证不足", "估值压力上升"],
     }
 )
+
+EXTRA_ALIAS_OVERRIDES = {
+    "ai_compute": ["ai compute", "gpu", "ai infrastructure", "AI算力", "算力", "AI基础设施"],
+    "sic": ["sic", "silicon carbide", "SiC", "碳化硅"],
+    "ev": ["ev", "electric vehicle", "新能源汽车", "新能源车", "电动车"],
+    "solar": ["solar", "photovoltaic", "pv", "光伏", "太阳能"],
+    "energy_storage": ["energy storage", "储能", "储能系统"],
+    "battery": ["battery", "lithium battery", "电池", "锂电池"],
+    "robotics": ["robotics", "robot", "humanoid", "机器人", "具身智能"],
+    "copper": ["copper", "铜", "工业金属"],
+    "oil": ["oil", "crude oil", "原油", "石油"],
+    "defense": ["defense", "aerospace defense", "军工", "国防军工"],
+    "brokerage": ["brokerage", "securities firm", "券商", "证券"],
+    "real_estate": ["real estate", "property", "房地产", "地产"],
+}
+
+industryTrendData = [
+    {**record, "aliases": EXTRA_ALIAS_OVERRIDES.get(record["id"], record.get("aliases", []))}
+    for record in industryTrendData
+]
+
+
+def _localized_theme(
+    *,
+    chinese_name: str,
+    category_zh: str,
+    stage_zh: str,
+    overview_zh: str,
+    summary_zh: str,
+    drivers: list[tuple[str, str, str]],
+    subsectors: list[tuple[str, str]],
+    chain: dict[str, list[str]],
+    catalysts: list[str],
+    risks: list[str],
+    status: str = "Diverging",
+    stage: str = "Stage 2: Trend Confirmation",
+    trend_score: float = 6.2,
+    market_confirmation: float = 6.1,
+    fundamental_validation: float = 5.8,
+    valuation_pressure: float = 5.9,
+    heat_level: str = "Moderate",
+) -> dict:
+    return {
+        "chineseName": chinese_name,
+        "categoryZh": category_zh,
+        "status": status,
+        "trendStage": stage,
+        "trendStageZh": stage_zh,
+        "trendScore": trend_score,
+        "marketConfirmation": market_confirmation,
+        "fundamentalValidation": fundamental_validation,
+        "valuationPressure": valuation_pressure,
+        "heatLevel": heat_level,
+        "overviewZh": overview_zh,
+        "summaryZh": summary_zh,
+        "trendStageExplanationZh": "当前为中性 mock 框架判断，重点观察价格确认、基本验证和产业链内部一致性。",
+        "keyDrivers": [
+            {
+                "name": name,
+                "nameZh": name_zh,
+                "status": status_label,
+                "explanation": f"{name} is tracked as a neutral framework driver.",
+                "explanationZh": explanation_zh,
+            }
+            for name, name_zh, status_label, explanation_zh in drivers
+        ],
+        "subSectors": [
+            {"name": name, "nameZh": name_zh, "status": status_label}
+            for name, name_zh, status_label in subsectors
+        ],
+        "industryChainZh": chain,
+        "catalystsZh": catalysts,
+        "riskSignalsZh": risks,
+    }
+
+
+V32_LOCALIZED_OVERRIDES = {
+    "ai_compute": _localized_theme(
+        chinese_name="AI 算力",
+        category_zh="科技成长",
+        stage_zh="第三阶段：主升扩散",
+        overview_zh="AI 算力关注 GPU、网络、服务器、电源散热和数据中心基础设施等环节。",
+        summary_zh="AI 算力处于中性偏强的趋势观察阶段，价格确认需要同时观察芯片、服务器和电力散热链条。",
+        status="Trend Intact",
+        stage="Stage 3: Maintrend Expansion",
+        trend_score=7.1,
+        market_confirmation=7.0,
+        fundamental_validation=6.8,
+        valuation_pressure=7.2,
+        heat_level="High",
+        drivers=[
+            ("AI infrastructure capex", "AI 基础设施资本开支", "Strong", "云厂商和企业 AI 基础设施投入是主要观察线索。"),
+            ("Accelerator demand", "加速芯片需求", "Strong", "GPU 和加速卡需求影响算力链条景气度。"),
+            ("Power and cooling constraints", "电力与散热约束", "Diverging", "电力、散热和机柜交付可能造成环节分化。"),
+        ],
+        subsectors=[("AI chips", "AI 芯片", "Strong"), ("Servers", "服务器", "Moderate-Strong"), ("Networking", "高速网络", "Strong"), ("Power cooling", "电源散热", "Diverging")],
+        chain={"upstream": ["芯片", "电源", "散热", "高速网络"], "midstream": ["AI 服务器", "机柜", "数据中心集成"], "downstream": ["云厂商", "企业 AI 应用", "模型训练与推理"]},
+        catalysts=["云资本开支变化", "AI 服务器交付节奏", "数据中心电力约束变化"],
+        risks=["估值压力", "供应链交付不均衡", "资本开支节奏放缓"],
+    ),
+    "cpu": _localized_theme(
+        chinese_name="CPU",
+        category_zh="科技成长",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="CPU 关注通用计算、服务器处理器、PC 周期和代工产能等环节。",
+        summary_zh="CPU 处于趋势确认阶段，服务器和端侧需求修复是主要观察点。",
+        drivers=[("Server CPU cycle", "服务器 CPU 周期", "Moderate", "服务器更新周期影响需求确认。"), ("PC recovery", "PC 需求修复", "Recovering", "PC 出货和库存变化影响短期表现。"), ("Foundry supply", "代工供给", "Moderate", "先进制程产能影响产品迭代。")],
+        subsectors=[("Server CPU", "服务器 CPU", "Moderate"), ("PC CPU", "PC CPU", "Recovering"), ("Mobile processors", "移动处理器", "Diverging")],
+        chain={"upstream": ["EDA", "IP", "先进制程"], "midstream": ["CPU 设计", "晶圆代工", "封装测试"], "downstream": ["服务器", "PC", "移动设备"]},
+        catalysts=["服务器更新周期", "PC 库存变化", "先进制程产品发布"],
+        risks=["需求修复不均衡", "竞争格局变化", "库存周期反复"],
+    ),
+    "cloud_computing": _localized_theme(
+        chinese_name="云计算",
+        category_zh="科技成长",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="云计算关注云厂商资本开支、企业 IT 支出、软件订阅和 AI 云服务需求。",
+        summary_zh="云计算处于趋势确认阶段，AI 云需求与企业软件支出共同影响价格确认。",
+        drivers=[("Cloud capex", "云资本开支", "Moderate-Strong", "云厂商资本开支决定基础设施需求。"), ("Enterprise software demand", "企业软件需求", "Moderate", "企业 IT 支出影响云软件景气度。"), ("AI cloud services", "AI 云服务", "Strong", "AI 服务增加算力和平台需求。")],
+        subsectors=[("Cloud platforms", "云平台", "Strong"), ("SaaS", "SaaS 软件", "Moderate"), ("Cloud infrastructure", "云基础设施", "Moderate-Strong")],
+        chain={"upstream": ["芯片", "服务器", "网络设备"], "midstream": ["云平台", "数据库", "SaaS"], "downstream": ["企业客户", "开发者", "AI 应用"]},
+        catalysts=["云收入增长", "AI 服务渗透率", "企业软件预算变化"],
+        risks=["资本开支波动", "企业预算收缩", "估值压力"],
+    ),
+    "data_center": _localized_theme(
+        chinese_name="数据中心",
+        category_zh="科技成长",
+        stage_zh="第三阶段：主升扩散",
+        stage="Stage 3: Maintrend Expansion",
+        overview_zh="数据中心关注机柜、电力、散热、服务器、网络设备和云厂商扩容节奏。",
+        summary_zh="数据中心处于主升扩散观察阶段，电力和散热约束使链条内部表现可能分化。",
+        status="Trend Intact",
+        trend_score=7.0,
+        market_confirmation=6.9,
+        heat_level="High",
+        drivers=[("Power capacity", "电力容量", "Strong", "电力供给是数据中心扩张的重要约束。"), ("Cooling demand", "散热需求", "Moderate-Strong", "高密度机柜提高散热系统需求。"), ("AI server deployment", "AI 服务器部署", "Strong", "AI 服务器交付影响数据中心建设节奏。")],
+        subsectors=[("Power equipment", "电力设备", "Strong"), ("Cooling systems", "散热系统", "Moderate-Strong"), ("Network equipment", "网络设备", "Strong")],
+        chain={"upstream": ["电力设备", "芯片", "服务器", "散热材料"], "midstream": ["数据中心建设", "机柜集成", "运维服务"], "downstream": ["云厂商", "AI 训练", "企业计算"]},
+        catalysts=["云厂商扩容", "电力审批进度", "AI 服务器交付"],
+        risks=["电力瓶颈", "建设节奏延后", "资本开支波动"],
+    ),
+    "sic": _localized_theme(
+        chinese_name="碳化硅",
+        category_zh="新能源与制造",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="碳化硅关注功率半导体、车载逆变器、充电桩和工业电源等应用。",
+        summary_zh="碳化硅处于趋势确认阶段，需求增长与价格压力需要同步观察。",
+        drivers=[("EV inverter demand", "车载逆变器需求", "Moderate", "新能源车逆变器是重要应用场景。"), ("Industrial power demand", "工业电源需求", "Moderate", "工业和能源场景提供增量需求。"), ("Substrate supply", "衬底供给", "Diverging", "衬底供给与价格变化可能造成分化。")],
+        subsectors=[("Substrates", "衬底", "Diverging"), ("Power devices", "功率器件", "Moderate"), ("Modules", "功率模块", "Moderate")],
+        chain={"upstream": ["衬底", "外延片", "设备"], "midstream": ["功率器件", "模块封装", "测试"], "downstream": ["新能源车", "充电桩", "工业电源"]},
+        catalysts=["新能源车需求变化", "衬底价格变化", "功率模块放量"],
+        risks=["价格竞争", "产能释放过快", "下游需求波动"],
+    ),
+    "ev": _localized_theme(
+        chinese_name="新能源车",
+        category_zh="新能源与制造",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="新能源车关注整车销量、价格竞争、供应链成本和智能化配置。",
+        summary_zh="新能源车处于趋势确认阶段，销量修复和价格竞争共同影响趋势质量。",
+        drivers=[("Delivery growth", "交付增长", "Moderate", "销量和交付节奏是核心观察指标。"), ("Price competition", "价格竞争", "Diverging", "价格策略影响利润率和行业分化。"), ("Smart features", "智能化配置", "Moderate", "智能驾驶和座舱配置影响产品竞争力。")],
+        subsectors=[("EV makers", "整车", "Diverging"), ("Battery chain", "电池链", "Moderate"), ("Charging", "充电设施", "Recovering")],
+        chain={"upstream": ["电池材料", "芯片", "电机电控"], "midstream": ["整车制造", "电池系统", "智能驾驶"], "downstream": ["消费者", "充电网络", "出行服务"]},
+        catalysts=["月度交付", "价格策略变化", "智能驾驶功能迭代"],
+        risks=["价格竞争加剧", "需求波动", "供应链成本变化"],
+    ),
+    "solar": _localized_theme(
+        chinese_name="光伏",
+        category_zh="新能源与制造",
+        stage_zh="第六阶段：趋势降温",
+        stage="Stage 6: Trend Cooling",
+        overview_zh="光伏关注装机需求、组件价格、硅料供需和海外政策环境。",
+        summary_zh="光伏处于趋势降温观察阶段，价格压力和供需再平衡是主要变量。",
+        status="Weakening",
+        trend_score=5.4,
+        market_confirmation=5.2,
+        valuation_pressure=5.7,
+        drivers=[("Installation demand", "装机需求", "Moderate", "全球装机需求影响出货节奏。"), ("Module pricing", "组件价格", "Weakening", "价格压力影响利润率。"), ("Supply rebalancing", "供需再平衡", "Diverging", "硅料、硅片和组件环节再平衡速度不同。")],
+        subsectors=[("Polysilicon", "硅料", "Weakening"), ("Modules", "组件", "Diverging"), ("Inverters", "逆变器", "Recovering")],
+        chain={"upstream": ["硅料", "硅片", "银浆"], "midstream": ["电池片", "组件", "逆变器"], "downstream": ["电站", "工商业屋顶", "户用需求"]},
+        catalysts=["装机数据", "组件价格变化", "海外政策变化"],
+        risks=["产能过剩", "价格压力", "贸易政策变化"],
+    ),
+    "energy_storage": _localized_theme(
+        chinese_name="储能",
+        category_zh="新能源与制造",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="储能关注电池系统、逆变器、电网侧项目和工商业储能需求。",
+        summary_zh="储能处于趋势确认阶段，项目落地和盈利模型仍需持续观察。",
+        drivers=[("Grid storage projects", "电网侧项目", "Moderate", "项目招标和并网节奏影响需求。"), ("Commercial storage", "工商业储能", "Moderate", "电价机制影响工商业储能回报。"), ("Battery cost", "电池成本", "Diverging", "电池价格变化影响系统成本。")],
+        subsectors=[("Battery systems", "电池系统", "Moderate"), ("PCS", "储能变流器", "Moderate"), ("Grid projects", "电网侧项目", "Diverging")],
+        chain={"upstream": ["电芯", "BMS", "PCS"], "midstream": ["储能系统集成", "项目建设", "运维"], "downstream": ["电网侧", "工商业", "户用储能"]},
+        catalysts=["储能招标", "电价机制变化", "电池成本变化"],
+        risks=["项目收益波动", "价格竞争", "并网节奏延后"],
+    ),
+    "battery": _localized_theme(
+        chinese_name="电池",
+        category_zh="新能源与制造",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="电池关注动力电池、储能电池、材料价格和产能利用率。",
+        summary_zh="电池处于趋势确认阶段，需求修复和材料价格变化共同影响链条表现。",
+        drivers=[("EV battery demand", "动力电池需求", "Moderate", "新能源车销量影响动力电池需求。"), ("Storage battery demand", "储能电池需求", "Moderate-Strong", "储能项目增加电池需求来源。"), ("Material prices", "材料价格", "Diverging", "锂、镍等材料价格影响利润率。")],
+        subsectors=[("Cells", "电芯", "Moderate"), ("Materials", "电池材料", "Diverging"), ("Storage batteries", "储能电池", "Moderate-Strong")],
+        chain={"upstream": ["锂资源", "正负极材料", "隔膜", "电解液"], "midstream": ["电芯", "电池包", "BMS"], "downstream": ["新能源车", "储能", "消费电子"]},
+        catalysts=["电池装机数据", "材料价格变化", "储能订单"],
+        risks=["产能利用率下降", "材料价格波动", "价格竞争"],
+    ),
+    "robotics": _localized_theme(
+        chinese_name="机器人",
+        category_zh="科技成长",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="机器人关注工业自动化、手术机器人、仓储物流和具身智能等方向。",
+        summary_zh="机器人处于趋势确认阶段，应用落地和成本下降是主要观察点。",
+        drivers=[("Industrial automation", "工业自动化", "Moderate", "制造业自动化升级影响需求。"), ("Embodied AI", "具身智能", "Emerging", "AI 模型进展提升长期关注度。"), ("Medical robotics", "医疗机器人", "Moderate-Strong", "手术机器人是成熟应用方向。")],
+        subsectors=[("Industrial robots", "工业机器人", "Moderate"), ("Medical robots", "医疗机器人", "Moderate-Strong"), ("Humanoid robots", "人形机器人", "Emerging")],
+        chain={"upstream": ["减速器", "伺服系统", "传感器", "芯片"], "midstream": ["机器人本体", "控制系统", "系统集成"], "downstream": ["制造业", "医疗", "物流", "服务场景"]},
+        catalysts=["应用场景落地", "核心零部件降本", "AI 模型能力提升"],
+        risks=["商业化进度慢", "成本下降不及预期", "订单波动"],
+    ),
+    "copper": _localized_theme(
+        chinese_name="铜",
+        category_zh="大宗商品",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="铜关注全球制造业需求、电网投资、新能源用铜和矿端供给。",
+        summary_zh="铜处于趋势确认阶段，宏观需求和供给扰动共同影响价格确认。",
+        drivers=[("Grid investment", "电网投资", "Moderate-Strong", "电网建设提升铜需求。"), ("Mine supply", "矿端供给", "Diverging", "矿山扰动影响供应预期。"), ("Global demand", "全球需求", "Moderate", "制造业周期影响铜价趋势。")],
+        subsectors=[("Copper miners", "铜矿企业", "Moderate-Strong"), ("Copper ETFs", "铜 ETF", "Moderate"), ("Industrial metals", "工业金属", "Diverging")],
+        chain={"upstream": ["铜矿", "冶炼", "精炼"], "midstream": ["铜材", "线缆", "合金"], "downstream": ["电网", "新能源", "建筑", "制造业"]},
+        catalysts=["电网投资数据", "矿端供给扰动", "制造业景气变化"],
+        risks=["全球需求走弱", "美元走强", "库存上升"],
+    ),
+    "oil": _localized_theme(
+        chinese_name="原油",
+        category_zh="大宗商品",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="原油关注供需平衡、库存、OPEC 产量政策和全球出行需求。",
+        summary_zh="原油处于趋势确认阶段，供给纪律和需求变化共同影响价格表现。",
+        drivers=[("Supply discipline", "供给纪律", "Moderate", "产量政策影响供给预期。"), ("Inventory cycle", "库存周期", "Diverging", "库存变化影响短期价格确认。"), ("Travel demand", "出行需求", "Moderate", "交通和航空需求影响消费端。")],
+        subsectors=[("Oil ETFs", "原油 ETF", "Moderate"), ("Integrated oil", "综合油气", "Moderate"), ("Oil services", "油服", "Diverging")],
+        chain={"upstream": ["勘探", "开采", "油服"], "midstream": ["运输", "管道", "炼化"], "downstream": ["成品油", "化工", "航空和交通"]},
+        catalysts=["OPEC 产量政策", "库存数据", "全球需求变化"],
+        risks=["需求走弱", "供应意外增加", "地缘风险波动"],
+    ),
+    "defense": _localized_theme(
+        chinese_name="军工",
+        category_zh="周期与工业",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="军工关注国防预算、订单节奏、航空航天和电子系统需求。",
+        summary_zh="军工处于趋势确认阶段，预算和订单兑现节奏是主要观察点。",
+        drivers=[("Defense budget", "国防预算", "Moderate-Strong", "预算变化影响行业需求。"), ("Order delivery", "订单交付", "Moderate", "订单交付节奏影响业绩验证。"), ("Aerospace systems", "航空航天系统", "Moderate", "航空航天装备是重要方向。")],
+        subsectors=[("Aerospace", "航空航天", "Moderate"), ("Defense electronics", "军工电子", "Moderate-Strong"), ("Shipbuilding", "舰船装备", "Diverging")],
+        chain={"upstream": ["材料", "电子元件", "发动机"], "midstream": ["整机装备", "系统集成", "军工电子"], "downstream": ["国防需求", "航空航天", "安全保障"]},
+        catalysts=["国防预算变化", "订单交付节奏", "航空航天项目进展"],
+        risks=["订单节奏延后", "成本压力", "估值压力"],
+    ),
+    "healthcare": _localized_theme(
+        chinese_name="医药",
+        category_zh="医疗健康",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="医药关注创新药、医疗服务、器械、生物科技和支付政策等方向。",
+        summary_zh="医药处于趋势确认阶段，产品周期、支付环境和市场风险偏好共同影响价格确认。",
+        drivers=[("Product cycle", "产品周期", "Moderate", "新产品和适应症拓展影响增长验证。"), ("Policy environment", "政策环境", "Diverging", "支付和监管环境影响估值与需求。"), ("Biotech funding", "生物科技融资", "Moderate", "融资环境影响研发型公司表现。")],
+        subsectors=[("Innovative drugs", "创新药", "Diverging"), ("Medical devices", "医疗器械", "Moderate"), ("Biotechnology", "生物科技", "Moderate")],
+        chain={"upstream": ["研发", "原料", "临床服务"], "midstream": ["药品", "器械", "生产制造"], "downstream": ["医院", "药房", "患者需求"]},
+        catalysts=["新产品进展", "医保和支付政策", "研发数据披露"],
+        risks=["政策不确定性", "研发失败", "支付压力"],
+    ),
+    "brokerage": _localized_theme(
+        chinese_name="券商",
+        category_zh="金融地产",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="券商关注交易活跃度、资本市场融资、财富管理和利率环境。",
+        summary_zh="券商处于趋势确认阶段，市场成交和资本市场活动是主要观察变量。",
+        drivers=[("Trading activity", "交易活跃度", "Moderate", "成交额影响经纪业务收入。"), ("Capital markets activity", "资本市场活动", "Diverging", "融资和承销环境影响投行业务。"), ("Wealth management", "财富管理", "Moderate", "客户资产规模影响长期收入质量。")],
+        subsectors=[("Retail brokers", "零售券商", "Moderate"), ("Investment banks", "投行券商", "Diverging"), ("Wealth platforms", "财富平台", "Moderate")],
+        chain={"upstream": ["客户资产", "交易系统", "资本金"], "midstream": ["经纪业务", "投行业务", "财富管理"], "downstream": ["个人客户", "机构客户", "资本市场"]},
+        catalysts=["市场成交额变化", "IPO 和再融资节奏", "财富管理规模变化"],
+        risks=["市场活跃度下降", "投行业务放缓", "利率波动"],
+    ),
+    "real_estate": _localized_theme(
+        chinese_name="房地产",
+        category_zh="金融地产",
+        stage_zh="第二阶段：趋势确认",
+        overview_zh="房地产关注 REITs、商业地产、住宅销售、融资环境和利率周期。",
+        summary_zh="房地产处于趋势确认阶段，不同资产类型的价格确认和基本验证存在分化。",
+        drivers=[("Rate cycle", "利率周期", "Moderate", "利率变化影响估值和融资成本。"), ("Property demand", "物业需求", "Diverging", "商业地产和住宅需求存在分化。"), ("Balance-sheet repair", "资产负债表修复", "Moderate", "融资环境影响行业稳定性。")],
+        subsectors=[("REITs", "REITs", "Moderate"), ("Industrial properties", "产业地产", "Moderate-Strong"), ("Retail properties", "零售地产", "Diverging")],
+        chain={"upstream": ["土地", "融资", "建筑材料"], "midstream": ["开发运营", "物业管理", "REITs"], "downstream": ["租户", "消费者", "企业需求"]},
+        catalysts=["利率变化", "租金和空置率变化", "融资环境改善"],
+        risks=["利率上行", "空置率上升", "资产估值压力"],
+    ),
+}
+
+for shared_id in ["innovative_drugs", "biotechnology", "medical_devices"]:
+    V32_LOCALIZED_OVERRIDES[shared_id] = {
+        **V32_LOCALIZED_OVERRIDES["healthcare"],
+        "chineseName": {
+            "innovative_drugs": "创新药",
+            "biotechnology": "生物科技",
+            "medical_devices": "医疗器械",
+        }[shared_id],
+    }
+
+industryTrendData = [
+    {**record, **V32_LOCALIZED_OVERRIDES.get(record["id"], {})}
+    for record in industryTrendData
+]
+
+CHINESE_NAME_OVERRIDES = {
+    "semiconductor": "半导体",
+    "cpo_optical_module": "CPO / 光模块",
+    "ai_compute": "AI 算力",
+    "cpu": "CPU",
+    "cloud_computing": "云计算",
+    "data_center": "数据中心",
+    "cybersecurity": "网络安全",
+    "consumer_electronics": "消费电子",
+    "robotics": "机器人",
+    "ev": "新能源车",
+    "battery": "电池",
+    "solar": "光伏",
+    "energy_storage": "储能",
+    "wind_power": "风电",
+    "sic": "碳化硅",
+    "power_equipment": "电力设备",
+    "industrial_automation": "工业自动化",
+    "gold": "黄金",
+    "copper": "铜",
+    "aluminum": "铝",
+    "lithium": "锂",
+    "rare_earth": "稀土",
+    "oil": "原油",
+    "natural_gas": "天然气",
+    "coal": "煤炭",
+    "liquor": "白酒",
+    "food_beverage": "食品饮料",
+    "tourism": "旅游",
+    "hotel": "酒店",
+    "aviation": "航空",
+    "gaming": "游戏",
+    "e_commerce": "电商",
+    "banking": "银行",
+    "insurance": "保险",
+    "brokerage": "券商",
+    "real_estate": "房地产",
+    "reits": "REITs",
+    "healthcare": "医药",
+    "innovative_drugs": "创新药",
+    "cxo": "医药外包",
+    "medical_devices": "医疗器械",
+    "biotechnology": "生物科技",
+    "ai_healthcare": "AI 医疗",
+    "chemicals": "化工",
+    "cement": "水泥",
+    "shipping": "航运",
+    "ports": "港口",
+    "logistics": "物流",
+    "defense": "军工",
+}
+
+CATEGORY_ZH_OVERRIDES = {
+    "Technology Growth": "科技成长",
+    "New Energy & Manufacturing": "新能源与制造",
+    "Commodities": "大宗商品",
+    "Consumer": "消费",
+    "Financial & Real Estate": "金融地产",
+    "Healthcare": "医疗健康",
+    "Cyclical & Industrial": "周期与工业",
+}
+
+TREND_STAGE_ZH_MAP = {
+    "Stage 1: Low-attention Accumulation": "第一阶段：低关注酝酿",
+    "Stage 2: Trend Confirmation": "第二阶段：趋势确认",
+    "Stage 3: Maintrend Expansion": "第三阶段：主升扩散",
+    "Stage 4: High-heat Divergence": "第四阶段：高热分化",
+    "Stage 5: Overpriced Volatility": "第五阶段：高估值波动",
+    "Stage 6: Trend Cooling": "第六阶段：趋势降温",
+}
+
+DRIVER_ZH_MAP = {
+    "demand cycle": "需求周期",
+    "Policy and capex visibility": "政策与资本开支可见度",
+    "Supply-chain pricing power": "供应链定价能力",
+}
+
+SUBSECTOR_ZH_MAP = {
+    "Component Suppliers": "组件供应商",
+    "Infrastructure Providers": "基础设施提供商",
+    "Application Layer": "应用层",
+}
+
+CHAIN_ZH_MAP = {
+    "Raw inputs": "原始投入",
+    "Core equipment": "核心设备",
+    "Specialized materials": "专用材料",
+    "Design tools": "设计工具",
+    "Manufacturing": "制造环节",
+    "Integration": "集成环节",
+    "Platform operators": "平台运营商",
+    "Distribution": "分发渠道",
+    "Enterprise demand": "企业需求",
+    "Consumer adoption": "消费者采用",
+    "Public projects": "公共项目",
+    "Global channels": "全球渠道",
+}
+
+CATALYST_ZH_MAP = {
+    "Capacity cycle changes": "产能周期变化",
+    "Policy or regulation updates": "政策或监管更新",
+    "Demand inflection in downstream applications": "下游应用需求拐点",
+}
+
+RISK_ZH_MAP = {
+    "Narrative runs ahead of validation": "叙事领先于验证",
+    "Margin or pricing divergence": "利润率或价格分化",
+    "Macro conditions reduce visibility": "宏观环境降低可见度",
+}
+
+
+def _complete_zh_fields(record: dict) -> dict:
+    completed = dict(record)
+    industry_id = completed["id"]
+    zh_name = CHINESE_NAME_OVERRIDES.get(industry_id, completed.get("chineseName") or completed["name"])
+    completed["chineseName"] = zh_name
+    completed.setdefault("categoryZh", CATEGORY_ZH_OVERRIDES.get(completed.get("category", ""), completed.get("category", "")))
+    completed.setdefault(
+        "overviewZh",
+        f"{zh_name} 当前使用中性行业趋势框架进行观察，主要参考关注度、价格广度、叙事强度、业绩周期验证和宏观敏感度。",
+    )
+    completed.setdefault(
+        "summaryZh",
+        f"{zh_name} 当前处于中性研究框架观察阶段，重点跟踪趋势阶段、市场价格确认、基本验证和风险信号。",
+    )
+    completed.setdefault("trendStageZh", TREND_STAGE_ZH_MAP.get(completed.get("trendStage", ""), "第二阶段：趋势确认"))
+    completed.setdefault(
+        "trendStageExplanationZh",
+        "该阶段用于描述主题在模拟趋势生命周期中的位置，从低关注酝酿到高热后的降温。",
+    )
+    completed["keyDrivers"] = [_complete_driver_zh(driver, zh_name) for driver in completed.get("keyDrivers", [])]
+    completed["subSectors"] = [_complete_subsector_zh(item, zh_name) for item in completed.get("subSectors", [])]
+    completed.setdefault(
+        "industryChainZh",
+        {
+            layer: [CHAIN_ZH_MAP.get(value, value) for value in values]
+            for layer, values in completed.get("industryChain", {}).items()
+        },
+    )
+    completed.setdefault("catalystsZh", [CATALYST_ZH_MAP.get(value, value) for value in completed.get("catalysts", [])])
+    completed.setdefault("riskSignalsZh", [RISK_ZH_MAP.get(value, value) for value in completed.get("riskSignals", [])])
+    return completed
+
+
+def _complete_driver_zh(driver: dict, zh_name: str) -> dict:
+    completed = dict(driver)
+    name = str(completed.get("name", ""))
+    if "nameZh" not in completed:
+        if name.endswith(" demand cycle"):
+            completed["nameZh"] = f"{zh_name}需求周期"
+        else:
+            completed["nameZh"] = DRIVER_ZH_MAP.get(name, name)
+    completed.setdefault("explanationZh", f"{completed['nameZh']}用于观察该行业趋势的验证强度和变化节奏。")
+    return completed
+
+
+def _complete_subsector_zh(item: dict, zh_name: str) -> dict:
+    completed = dict(item)
+    name = str(completed.get("name", ""))
+    if "nameZh" not in completed:
+        if name.endswith(" Leaders"):
+            completed["nameZh"] = f"{zh_name}龙头样本"
+        else:
+            completed["nameZh"] = SUBSECTOR_ZH_MAP.get(name, name)
+    return completed
+
+
+industryTrendData = [_complete_zh_fields(record) for record in industryTrendData]
+GENERIC_INDUSTRY_TEMPLATE = _complete_zh_fields(GENERIC_INDUSTRY_TEMPLATE)

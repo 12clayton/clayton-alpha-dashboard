@@ -36,6 +36,199 @@ INDUSTRY_MARKET_TICKERS = {
         "leaders": ["JPM", "BAC", "WFC", "GS", "MS"],
         "benchmark": "SPY",
     },
+    "ai_compute": {
+        "etfs": ["BOTZ", "AIQ"],
+        "leaders": ["NVDA", "AMD", "AVGO", "ANET", "SMCI", "DELL", "VRT"],
+        "benchmark": "QQQ",
+    },
+    "cpu": {
+        "etfs": [],
+        "leaders": ["AMD", "INTC", "ARM", "QCOM", "TSM"],
+        "benchmark": "QQQ",
+        "no_dedicated_etf": True,
+    },
+    "cloud_computing": {
+        "etfs": ["SKYY", "CLOU", "WCLD"],
+        "leaders": ["MSFT", "AMZN", "GOOGL", "ORCL", "CRM", "NOW"],
+        "benchmark": "QQQ",
+    },
+    "data_center": {
+        "etfs": ["VPN", "SRVR"],
+        "leaders": ["VRT", "ETN", "DELL", "SMCI", "ANET", "NVDA", "AVGO"],
+        "benchmark": "QQQ",
+    },
+    "sic": {
+        "etfs": [],
+        "leaders": ["ON", "STM", "WOLF", "ROHM", "IFNNY"],
+        "benchmark": "QQQ",
+        "no_dedicated_etf": True,
+        "proxy_note_key": "sic_proxy_note",
+    },
+    "ev": {
+        "etfs": ["DRIV", "IDRV", "KARS"],
+        "leaders": ["TSLA", "BYDDY", "LI", "NIO", "XPEV", "RIVN"],
+        "benchmark": "QQQ",
+    },
+    "solar": {
+        "etfs": ["TAN", "RAYS"],
+        "leaders": ["FSLR", "ENPH", "SEDG", "JKS", "CSIQ"],
+        "benchmark": "SPY",
+    },
+    "energy_storage": {
+        "etfs": ["LIT", "BATT"],
+        "leaders": ["ALB", "SQM", "TSLA", "BYDDY", "QS", "FLNC"],
+        "benchmark": "SPY",
+    },
+    "battery": {
+        "etfs": ["LIT", "BATT"],
+        "leaders": ["ALB", "SQM", "TSLA", "BYDDY", "QS", "FLNC"],
+        "benchmark": "SPY",
+    },
+    "robotics": {
+        "etfs": ["BOTZ", "ROBO"],
+        "leaders": ["ISRG", "ABBNY", "FANUY", "TER", "SYM", "NVDA"],
+        "benchmark": "QQQ",
+    },
+    "copper": {
+        "etfs": ["CPER", "COPX"],
+        "leaders": ["FCX", "SCCO", "TECK", "BHP", "RIO"],
+        "benchmark": "SPY",
+    },
+    "oil": {
+        "etfs": ["USO", "XLE", "XOP"],
+        "leaders": ["XOM", "CVX", "COP", "SLB", "EOG"],
+        "benchmark": "SPY",
+    },
+    "defense": {
+        "etfs": ["ITA", "XAR"],
+        "leaders": ["LMT", "RTX", "NOC", "GD", "LHX", "BA"],
+        "benchmark": "SPY",
+    },
+    "healthcare": {
+        "etfs": ["XLV", "IBB", "XBI"],
+        "leaders": ["LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO"],
+        "benchmark": "SPY",
+    },
+    "innovative_drugs": {
+        "etfs": ["XLV", "IBB", "XBI"],
+        "leaders": ["LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO"],
+        "benchmark": "SPY",
+    },
+    "biotechnology": {
+        "etfs": ["XLV", "IBB", "XBI"],
+        "leaders": ["LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO"],
+        "benchmark": "SPY",
+    },
+    "medical_devices": {
+        "etfs": ["XLV", "IBB", "XBI"],
+        "leaders": ["LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO"],
+        "benchmark": "SPY",
+    },
+    "brokerage": {
+        "etfs": ["IAI"],
+        "leaders": ["SCHW", "IBKR", "HOOD", "MS", "GS"],
+        "benchmark": "SPY",
+    },
+    "real_estate": {
+        "etfs": ["XLRE", "VNQ", "IYR"],
+        "leaders": ["AMT", "PLD", "EQIX", "SPG", "O"],
+        "benchmark": "SPY",
+    },
+    "cxo": {
+        "etfs": ["IBB", "XBI"],
+        "leaders": ["TMO", "IQV", "ICLR", "CRL", "WUXAY"],
+        "benchmark": "SPY",
+        "no_dedicated_etf": True,
+        "proxy_note_key": "cxo_proxy_note",
+    },
+    "shipping": {
+        "etfs": ["SEA"],
+        "leaders": ["ZIM", "MATX", "DAC", "SBLK", "GNK"],
+        "benchmark": "SPY",
+    },
+    "insurance": {
+        "etfs": ["KIE"],
+        "leaders": ["BRK-B", "CB", "PGR", "TRV", "AIG", "MET", "PRU"],
+        "benchmark": "SPY",
+    },
+    "reits": {
+        "etfs": ["VNQ", "SCHH", "IYR"],
+        "leaders": ["O", "PLD", "AMT", "EQIX", "SPG"],
+        "benchmark": "SPY",
+    },
+    "coal": {
+        "etfs": [],
+        "leaders": ["BTU", "ARCH", "CEIX", "HCC"],
+        "benchmark": "SPY",
+        "no_dedicated_etf": True,
+    },
+    "natural_gas": {
+        "etfs": ["UNG", "FCG"],
+        "leaders": ["EQT", "LNG", "CTRA", "RRC", "AR"],
+        "benchmark": "SPY",
+    },
+    "lithium": {
+        "etfs": ["LIT"],
+        "leaders": ["ALB", "SQM", "LAC", "PLL", "SGML"],
+        "benchmark": "SPY",
+    },
+    "rare_earth": {
+        "etfs": ["REMX"],
+        "leaders": ["MP", "LYSDY"],
+        "benchmark": "SPY",
+    },
+    "gaming": {
+        "etfs": ["HERO", "ESPO"],
+        "leaders": ["NTES", "TCEHY", "EA", "TTWO", "RBLX", "SONY"],
+        "benchmark": "QQQ",
+    },
+    "e_commerce": {
+        "etfs": ["IBUY", "ONLN"],
+        "leaders": ["AMZN", "BABA", "JD", "PDD", "MELI", "SHOP", "EBAY"],
+        "benchmark": "QQQ",
+    },
+    "consumer_electronics": {
+        "etfs": [],
+        "leaders": ["AAPL", "SONY", "SSNLF", "PCRFY", "GRMN"],
+        "benchmark": "QQQ",
+        "no_dedicated_etf": True,
+    },
+    "cybersecurity": {
+        "etfs": ["CIBR", "HACK", "BUG"],
+        "leaders": ["CRWD", "PANW", "ZS", "FTNT", "OKTA", "S"],
+        "benchmark": "QQQ",
+    },
+    "wind_power": {
+        "etfs": ["FAN"],
+        "leaders": ["NEE", "GE", "VWSYF", "VWDRY", "TPIC"],
+        "benchmark": "SPY",
+        "proxy_note_key": "wind_power_proxy_note",
+    },
+    "industrial_automation": {
+        "etfs": ["ROBO", "BOTZ"],
+        "leaders": ["ABBNY", "FANUY", "ROK", "EMR", "HON", "TER"],
+        "benchmark": "SPY",
+    },
+    "aluminum": {
+        "etfs": ["JJU", "DBB"],
+        "leaders": ["AA", "CENX", "RIO", "BHP", "ACH"],
+        "benchmark": "SPY",
+    },
+    "aviation": {
+        "etfs": ["JETS"],
+        "leaders": ["DAL", "UAL", "AAL", "LUV", "CPA"],
+        "benchmark": "SPY",
+    },
+    "chemicals": {
+        "etfs": ["XLB", "IYM"],
+        "leaders": ["DOW", "DD", "LYB", "APD", "LIN", "CE"],
+        "benchmark": "SPY",
+    },
+    "logistics": {
+        "etfs": ["IYT"],
+        "leaders": ["UPS", "FDX", "CHRW", "EXPD", "JBHT", "XPO"],
+        "benchmark": "SPY",
+    },
 }
 
 
@@ -54,6 +247,8 @@ class MarketDataResult:
     failed_tickers: list[str] | None = None
     failed_ticker_details: list[dict[str, str]] | None = None
     has_etf_sample: bool = False
+    no_dedicated_etf: bool = False
+    proxy_note_key: str | None = None
     score: float | None = None
     above_ma20_ratio: float | None = None
     above_ma20_count: int = 0
@@ -71,6 +266,7 @@ class MarketDataResult:
     benchmark_3m_return: float | None = None
     relative_strength: float | None = None
     details: list[dict[str, Any]] | None = None
+    reason_code: str | None = None
 
 
 def has_market_mapping(industry_id: str) -> bool:
@@ -89,6 +285,7 @@ def get_market_confirmation_data(industry_id: str) -> dict[str, Any]:
             return _result(
                 available=False,
                 message="No live market ticker mapping for this industry.",
+                reason_code="no_market_mapping",
                 tickers=[],
                 benchmark=None,
             )
@@ -104,11 +301,14 @@ def get_market_confirmation_data(industry_id: str) -> dict[str, Any]:
             "benchmark_ticker": benchmark,
             "last_updated": _timestamp(),
             "has_etf_sample": bool(mapping["etfs"]),
+            "no_dedicated_etf": bool(mapping.get("no_dedicated_etf", not mapping["etfs"])),
+            "proxy_note_key": mapping.get("proxy_note_key"),
         }
         if close_prices.empty:
             return _result(
                 available=False,
                 message="No price data returned.",
+                reason_code="market_data_failed",
                 failed_tickers=tickers,
                 failed_ticker_details=[{"ticker": ticker, "reason": "empty data"} for ticker in tickers],
                 **base_meta,
@@ -135,6 +335,7 @@ def get_market_confirmation_data(industry_id: str) -> dict[str, Any]:
             return _result(
                 available=False,
                 message="Insufficient ticker or benchmark data.",
+                reason_code="market_data_failed",
                 valid_ticker_count=len(details),
                 failed_tickers=failed_tickers,
                 failed_ticker_details=failed_ticker_details,
@@ -156,6 +357,7 @@ def get_market_confirmation_data(industry_id: str) -> dict[str, Any]:
         return _result(
             available=False,
             message=f"Market data unavailable: {exc}",
+            reason_code="market_data_failed",
             tickers=[],
             benchmark=None,
         )
