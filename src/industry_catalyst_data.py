@@ -46,6 +46,83 @@ CONFIDENCE_LABELS = {
     "en": {},
 }
 
+CATALYST_GUIDE = {
+    "zh": {
+        "title": "催化事件说明",
+        "event_types_title": "事件类型说明",
+        "impact_title": "影响方向说明",
+        "confidence_title": "可信度说明",
+        "heat_title": "新闻热度说明",
+        "columns": {"item": "项目", "meaning": "含义"},
+        "event_types": {
+            "政策": "政策事件指政府、监管机构、产业政策、补贴、限制、准入规则等变化。它可能改变行业需求、供给、盈利预期或估值环境。",
+            "财报": "财报事件指公司季度或年度业绩、业绩指引、利润率、订单、库存等信息。它通常用于验证行业趋势是否转化为真实经营结果。",
+            "订单": "订单事件指客户订单、合同、出货、采购计划或 backlog 变化。它通常是判断产业需求是否真实存在的重要线索。",
+            "资本开支": "资本开支事件指云厂商、制造商、能源公司、政府或企业扩大投资。它通常会影响上游设备、材料、基础设施和供应链需求。",
+            "技术": "技术事件指新产品、技术路线、性能突破、成本下降、产业标准变化等。它可能改变行业竞争格局或打开新的需求空间。",
+            "宏观": "宏观事件指利率、汇率、通胀、就业、流动性、经济周期等变化。它通常影响行业估值、需求弹性和风险偏好。",
+            "供应链": "供应链事件指产能、库存、交付周期、原材料、物流、供应瓶颈等变化。它可能影响价格、利润率和出货节奏。",
+            "价格周期": "价格周期事件指产品价格、商品价格、库存周期、供需缺口等变化。它常见于半导体、资源品、光伏、化工等周期属性较强的行业。",
+            "监管": "监管事件指反垄断、出口管制、金融监管、行业规范、安全审查等变化。它可能改变行业竞争规则或风险溢价。",
+            "地缘政治": "地缘政治事件指贸易摩擦、制裁、冲突、供应链重构、国家安全相关限制等。它可能影响全球产业链和资产风险偏好。",
+            "产品": "产品事件指新品发布、产品迭代、商业化进展、客户验证等。它通常用于观察技术路线是否进入实际市场应用。",
+        },
+        "impact": {
+            "正面": "事件倾向于增强行业需求、盈利预期、价格确认或市场关注度。",
+            "中性": "事件对行业趋势影响有限，更多是信息更新。",
+            "负面": "事件可能压制需求、利润率、估值或市场风险偏好。",
+            "混合": "事件同时包含正面和负面因素，需要结合后续数据观察。",
+        },
+        "confidence": {
+            "高": "事件来源或数据较明确，和行业趋势的关联较直接。",
+            "中": "事件有一定参考价值，但仍需要更多数据验证。",
+            "低": "事件更多是早期信号、市场传闻或间接线索，需要谨慎解读。",
+        },
+        "heat": {
+            "新闻热度分": "用于描述该行业在 V4.1 本地框架中的关注度强弱，不代表实时新闻统计。",
+            "热度等级": "低、中、高、很高，用于快速描述关注度区间。",
+            "热度方向": "升温、稳定、降温、分化，用于描述关注度变化的方向。",
+        },
+    },
+    "en": {
+        "title": "Catalyst Event Guide",
+        "event_types_title": "Event Type Guide",
+        "impact_title": "Impact Direction Guide",
+        "confidence_title": "Confidence Guide",
+        "heat_title": "News Heat Guide",
+        "columns": {"item": "Item", "meaning": "Meaning"},
+        "event_types": {
+            "Policy": "Policy events refer to changes in government actions, regulators, industry policy, subsidies, restrictions, access rules, or similar conditions. They may affect demand, supply, earnings expectations, or valuation conditions.",
+            "Earnings": "Earnings events refer to quarterly or annual results, guidance, margins, orders, inventory, and related operating data. They help validate whether an industry trend is translating into operating results.",
+            "Order": "Order events refer to customer orders, contracts, shipments, procurement plans, or backlog changes. They are useful clues for judging whether industrial demand is materializing.",
+            "Capex": "Capex events refer to expanded investment by cloud vendors, manufacturers, energy companies, governments, or enterprises. They often affect upstream equipment, materials, infrastructure, and supply-chain demand.",
+            "Technology": "Technology events refer to new products, technical routes, performance breakthroughs, cost reductions, or industry-standard changes. They may reshape competition or open new demand space.",
+            "Macro": "Macro events refer to rates, currencies, inflation, employment, liquidity, and economic cycles. They often affect valuation, demand elasticity, and risk appetite.",
+            "Supply Chain": "Supply-chain events refer to capacity, inventory, delivery cycles, raw materials, logistics, and supply bottlenecks. They may affect prices, margins, and shipment timing.",
+            "Price Cycle": "Price-cycle events refer to changes in product prices, commodity prices, inventory cycles, and supply-demand gaps. They are common in industries with stronger cyclical attributes.",
+            "Regulation": "Regulation events refer to antitrust actions, export controls, financial regulation, industry rules, and security reviews. They may change competitive rules or risk premiums.",
+            "Geopolitical": "Geopolitical events refer to trade friction, sanctions, conflicts, supply-chain restructuring, and national-security restrictions. They may affect global supply chains and asset risk appetite.",
+            "Product": "Product events refer to launches, iterations, commercialization progress, and customer validation. They help observe whether a technical route is entering real market application.",
+        },
+        "impact": {
+            "Positive": "The event tends to strengthen industry demand, earnings expectations, price confirmation, or market attention.",
+            "Neutral": "The event has limited effect on the industry trend and is mainly an information update.",
+            "Negative": "The event may weigh on demand, margins, valuation, or market risk appetite.",
+            "Mixed": "The event contains both positive and negative elements and requires follow-up data.",
+        },
+        "confidence": {
+            "High": "The event source or data is relatively clear and directly connected to the industry trend.",
+            "Medium": "The event has reference value, but still requires more data validation.",
+            "Low": "The event is more of an early signal, market rumor, or indirect clue and should be interpreted cautiously.",
+        },
+        "heat": {
+            "News Heat Score": "Describes attention strength in the V4.1 local framework. It is not a live news statistic.",
+            "Heat Level": "Low, Medium, High, and Very High provide a quick attention-range label.",
+            "Heat Direction": "Rising, Stable, Falling, and Mixed describe the direction of attention changes.",
+        },
+    },
+}
+
 
 INDUSTRY_CATALYST_DATA: dict[str, dict[str, Any]] = {
     "semiconductor": {

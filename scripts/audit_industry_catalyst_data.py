@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
 if "streamlit" not in sys.modules:
     sys.modules["streamlit"] = types.SimpleNamespace(cache_data=lambda *args, **kwargs: (lambda func: func))
 
-from src.industry_catalyst_data import INDUSTRY_CATALYST_DATA
+from src.industry_catalyst_data import CATALYST_GUIDE, INDUSTRY_CATALYST_DATA
 from src.industry_trend_data import industryTrendData
 
 
@@ -55,6 +55,7 @@ def main() -> int:
     missing_fields = []
     unknown_industries = []
     english_residue = []
+    guide_issues = audit_catalyst_guide()
 
     for industry_id, payload in INDUSTRY_CATALYST_DATA.items():
         if industry_id not in known_ids:
@@ -76,8 +77,9 @@ def main() -> int:
     print_report("UNKNOWN INDUSTRY IDS", unknown_industries)
     print_report("MISSING CATALYST FIELDS", missing_fields)
     print_report("ENGLISH RESIDUE IN ZH FIELDS", english_residue)
+    print_report("CATALYST GUIDE ISSUES", guide_issues)
 
-    return 1 if unknown_industries or missing_fields or english_residue else 0
+    return 1 if unknown_industries or missing_fields or english_residue or guide_issues else 0
 
 
 def missing_top_fields(payload: dict) -> list[str]:
@@ -101,6 +103,40 @@ def find_english_residue(payload: dict) -> list[str]:
         if any(pattern in value for value in zh_values):
             residues.append(pattern)
     return residues
+
+
+def audit_catalyst_guide() -> list[str]:
+    issues = []
+    required_languages = ["zh", "en"]
+    required_sections = [
+        "title",
+        "event_types_title",
+        "impact_title",
+        "confidence_title",
+        "heat_title",
+        "columns",
+        "event_types",
+        "impact",
+        "confidence",
+        "heat",
+    ]
+    for lang in required_languages:
+        guide = CATALYST_GUIDE.get(lang)
+        if not guide:
+            issues.append(f"missing guide language: {lang}")
+            continue
+        for section in required_sections:
+            if not guide.get(section):
+                issues.append(f"{lang}.{section}")
+        if len(guide.get("event_types", {})) < 11:
+            issues.append(f"{lang}.event_types incomplete")
+        if len(guide.get("impact", {})) < 4:
+            issues.append(f"{lang}.impact incomplete")
+        if len(guide.get("confidence", {})) < 3:
+            issues.append(f"{lang}.confidence incomplete")
+        if len(guide.get("heat", {})) < 3:
+            issues.append(f"{lang}.heat incomplete")
+    return issues
 
 
 def print_report(title: str, payload: object) -> None:

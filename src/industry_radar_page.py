@@ -33,6 +33,7 @@ from src.industry_trend_page import (
     format_percent,
     format_score,
     industry_name,
+    render_catalyst_event_guide,
     render_trend_stage_guide,
     render_trend_status_guide,
     translate_status,
@@ -191,6 +192,8 @@ def render_industry_radar_page(lang: str) -> None:
     render_snapshot_controls(radar_records, filtered_records, lang)
     render_radar_charts(filtered_records, watchlist, lang)
     render_snapshot_expander(lang)
+    radar_catalyst_title = "新闻热度与催化事件说明" if lang == "zh" else "News Heat & Catalyst Guide"
+    render_catalyst_event_guide(lang, title_override=radar_catalyst_title)
     render_trend_status_guide(lang)
     render_trend_stage_guide(lang)
     render_radar_table(filtered_records, lang)

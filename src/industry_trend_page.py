@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src.industry_catalyst_data import (
+    CATALYST_GUIDE,
     CONFIDENCE_LABELS,
     EVENT_TYPE_LABELS,
     HEAT_DIRECTION_LABELS,
@@ -736,6 +737,33 @@ def render_news_heat_catalysts(industry: dict, lang: str) -> None:
         )
     if rows:
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    render_catalyst_event_guide(lang)
+
+
+def render_catalyst_event_guide(lang: str, title_override: str | None = None) -> None:
+    """Render the local V4.1 catalyst guide."""
+
+    guide = CATALYST_GUIDE[lang]
+    title = title_override or guide["title"]
+    with st.expander(title, expanded=False):
+        for section_key, section_title_key in [
+            ("event_types", "event_types_title"),
+            ("impact", "impact_title"),
+            ("confidence", "confidence_title"),
+            ("heat", "heat_title"),
+        ]:
+            st.markdown(f"**{guide[section_title_key]}**")
+            st.dataframe(
+                catalyst_guide_frame(guide[section_key], guide["columns"]),
+                width="stretch",
+                hide_index=True,
+            )
+
+
+def catalyst_guide_frame(items: dict[str, str], columns: dict[str, str]) -> pd.DataFrame:
+    """Build a two-column guide dataframe."""
+
+    return pd.DataFrame([{columns["item"]: key, columns["meaning"]: value} for key, value in items.items()])
 
 
 def render_market_meta_strip(result: dict, lang: str) -> None:
