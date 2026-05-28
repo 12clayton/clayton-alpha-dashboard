@@ -909,6 +909,145 @@ industryTrendData = [
     for record in industryTrendData
 ]
 
+
+def _semantic_quality_override(
+    subsectors: list[tuple[str, str]],
+    chain: dict[str, list[str]],
+    chain_zh: dict[str, list[str]],
+) -> dict:
+    return {
+        "subSectors": [
+            {"name": name, "nameZh": name_zh, "status": "Framework"}
+            for name, name_zh in subsectors
+        ],
+        "industryChain": chain,
+        "industryChainZh": chain_zh,
+    }
+
+
+SEMANTIC_QUALITY_OVERRIDES = {
+    "food_beverage": _semantic_quality_override(
+        [("Staple food", "主食"), ("Beverages", "饮料"), ("Condiments", "调味品"), ("Dairy products", "乳制品"), ("Retail channels", "零售渠道")],
+        {"upstream": ["Agricultural inputs", "Packaging", "Food ingredients"], "midstream": ["Food processing", "Brand operation", "Distribution"], "downstream": ["Retail", "Restaurants", "Household consumption"]},
+        {"upstream": ["农产品", "包装材料", "食品原料"], "midstream": ["食品加工", "品牌运营", "渠道分销"], "downstream": ["零售渠道", "餐饮渠道", "家庭消费"]},
+    ),
+    "tourism": _semantic_quality_override(
+        [("Domestic travel", "国内游"), ("Outbound travel", "出境游"), ("Scenic spots", "景区"), ("Travel agencies", "旅行社"), ("Online travel platforms", "在线旅游平台")],
+        {"upstream": ["Transport capacity", "Hotel supply", "Tourism resources"], "midstream": ["Travel products", "Booking platforms", "Tour operators"], "downstream": ["Leisure travelers", "Family travel", "Business travel"]},
+        {"upstream": ["交通运力", "酒店供给", "旅游资源"], "midstream": ["旅游产品", "预订平台", "旅行服务商"], "downstream": ["休闲游客", "家庭出游", "商务出行"]},
+    ),
+    "hotel": _semantic_quality_override(
+        [("Luxury hotels", "高端酒店"), ("Business hotels", "商务酒店"), ("Economy hotels", "经济型酒店"), ("Resort hotels", "度假酒店"), ("Hotel management", "酒店管理")],
+        {"upstream": ["Property assets", "Labor", "Supplies"], "midstream": ["Hotel operation", "Room pricing", "Membership systems"], "downstream": ["Business guests", "Tourists", "Meetings and events"]},
+        {"upstream": ["物业资产", "人力服务", "酒店用品"], "midstream": ["酒店运营", "房价管理", "会员体系"], "downstream": ["商务客群", "旅游客群", "会议活动"]},
+    ),
+    "aviation": _semantic_quality_override(
+        [("Full-service airlines", "全服务航空"), ("Low-cost airlines", "低成本航空"), ("Airports", "机场"), ("Aircraft leasing", "飞机租赁"), ("Air travel services", "航空出行服务")],
+        {"upstream": ["Aircraft", "Aviation fuel", "Airport slots"], "midstream": ["Passenger airlines", "Route networks", "Revenue management"], "downstream": ["Business travel", "Leisure travel", "Cargo demand"]},
+        {"upstream": ["飞机", "航油", "机场时刻"], "midstream": ["客运航空", "航线网络", "收益管理"], "downstream": ["商务出行", "休闲出行", "货运需求"]},
+    ),
+    "gaming": _semantic_quality_override(
+        [("Mobile games", "移动游戏"), ("PC games", "PC 游戏"), ("Console games", "主机游戏"), ("Game publishing", "游戏发行"), ("Esports", "电竞")],
+        {"upstream": ["Game IP", "Development talent", "Content tools"], "midstream": ["Game development", "Publishing", "Live operations"], "downstream": ["Players", "Streaming communities", "Esports audiences"]},
+        {"upstream": ["游戏 IP", "研发人才", "内容工具"], "midstream": ["游戏研发", "游戏发行", "长线运营"], "downstream": ["玩家用户", "直播社区", "电竞观众"]},
+    ),
+    "e_commerce": _semantic_quality_override(
+        [("Marketplace platforms", "综合电商"), ("Cross-border e-commerce", "跨境电商"), ("Live commerce", "直播电商"), ("Logistics services", "履约物流"), ("Merchant services", "商家服务")],
+        {"upstream": ["Merchants", "Brands", "Warehousing"], "midstream": ["E-commerce platforms", "Payment and fulfillment", "Marketing services"], "downstream": ["Online consumers", "Private-domain traffic", "Cross-border buyers"]},
+        {"upstream": ["商家", "品牌", "仓储"], "midstream": ["电商平台", "支付与履约", "营销服务"], "downstream": ["线上消费者", "私域流量", "跨境买家"]},
+    ),
+    "banking": _semantic_quality_override(
+        [("Large banks", "大型银行"), ("Regional banks", "区域银行"), ("Retail banking", "零售银行"), ("Corporate banking", "对公银行"), ("Wealth management", "财富管理")],
+        {"upstream": ["Deposits", "Capital", "Funding markets"], "midstream": ["Lending", "Asset-liability management", "Risk control"], "downstream": ["Households", "Corporates", "Public-sector clients"]},
+        {"upstream": ["存款", "资本金", "同业资金"], "midstream": ["信贷投放", "资产负债管理", "风险控制"], "downstream": ["居民客户", "企业客户", "公共部门客户"]},
+    ),
+    "insurance": _semantic_quality_override(
+        [("Life insurance", "寿险"), ("Property insurance", "财险"), ("Health insurance", "健康险"), ("Reinsurance", "再保险"), ("Agency channels", "代理人渠道")],
+        {"upstream": ["Policyholders", "Capital", "Actuarial data"], "midstream": ["Underwriting", "Claims management", "Investment portfolio"], "downstream": ["Households", "Corporates", "Healthcare services"]},
+        {"upstream": ["投保客户", "资本金", "精算数据"], "midstream": ["承保", "理赔管理", "投资组合"], "downstream": ["居民客户", "企业客户", "医疗服务"]},
+    ),
+    "brokerage": _semantic_quality_override(
+        [("Retail brokerage", "零售经纪"), ("Investment banking", "投行业务"), ("Asset management", "资产管理"), ("Wealth platforms", "财富平台"), ("Institutional services", "机构业务")],
+        {"upstream": ["Client assets", "Market liquidity", "Capital base"], "midstream": ["Brokerage services", "Capital markets services", "Wealth management"], "downstream": ["Retail clients", "Institutional clients", "Listed companies"]},
+        {"upstream": ["客户资产", "市场流动性", "资本金"], "midstream": ["经纪业务", "资本市场服务", "财富管理"], "downstream": ["个人客户", "机构客户", "上市公司"]},
+    ),
+    "real_estate": _semantic_quality_override(
+        [("Residential property", "住宅地产"), ("Commercial property", "商业地产"), ("Industrial parks", "产业园区"), ("Property services", "物业服务"), ("REITs", "REITs")],
+        {"upstream": ["Land", "Financing", "Building materials"], "midstream": ["Development", "Property operation", "Asset management"], "downstream": ["Homebuyers", "Tenants", "Enterprises"]},
+        {"upstream": ["土地", "融资", "建筑材料"], "midstream": ["开发建设", "物业运营", "资产管理"], "downstream": ["购房者", "租户", "企业客户"]},
+    ),
+    "reits": _semantic_quality_override(
+        [("Industrial REITs", "产业园 REITs"), ("Warehouse REITs", "仓储物流 REITs"), ("Retail REITs", "零售 REITs"), ("Infrastructure REITs", "基础设施 REITs"), ("Data-center REITs", "数据中心 REITs")],
+        {"upstream": ["Underlying assets", "Sponsors", "Debt financing"], "midstream": ["REIT operation", "Asset management", "Rental collection"], "downstream": ["Tenants", "Institutional capital", "Public investors"]},
+        {"upstream": ["底层资产", "原始权益人", "债务融资"], "midstream": ["REITs 运营", "资产管理", "租金回收"], "downstream": ["租户", "机构资金", "公众投资者"]},
+    ),
+    "healthcare": _semantic_quality_override(
+        [("Pharmaceuticals", "药品"), ("Medical services", "医疗服务"), ("Medical devices", "医疗器械"), ("Biotechnology", "生物科技"), ("Healthcare IT", "医疗信息化")],
+        {"upstream": ["Research inputs", "Clinical resources", "Regulatory pathways"], "midstream": ["Drug development", "Device manufacturing", "Healthcare services"], "downstream": ["Hospitals", "Patients", "Payers"]},
+        {"upstream": ["研发资源", "临床资源", "监管路径"], "midstream": ["药物研发", "器械制造", "医疗服务"], "downstream": ["医院", "患者", "支付方"]},
+    ),
+    "innovative_drugs": _semantic_quality_override(
+        [("Oncology drugs", "肿瘤药"), ("Autoimmune drugs", "自免药"), ("Metabolic drugs", "代谢药"), ("Biologics", "生物药"), ("Licensing deals", "授权合作")],
+        {"upstream": ["Targets", "Research platforms", "Clinical resources"], "midstream": ["Preclinical research", "Clinical trials", "Registration"], "downstream": ["Hospitals", "Patients", "Payers"]},
+        {"upstream": ["靶点", "研发平台", "临床资源"], "midstream": ["临床前研究", "临床试验", "注册申报"], "downstream": ["医院", "患者", "支付方"]},
+    ),
+    "cxo": _semantic_quality_override(
+        [("CRO", "CRO"), ("CDMO", "CDMO"), ("Clinical services", "临床服务"), ("Laboratory services", "实验室服务"), ("Manufacturing services", "生产服务")],
+        {"upstream": ["Drug sponsors", "Research demand", "Clinical projects"], "midstream": ["CRO services", "CDMO manufacturing", "Project delivery"], "downstream": ["Biotech clients", "Pharma clients", "Regulatory filings"]},
+        {"upstream": ["药企客户", "研发需求", "临床项目"], "midstream": ["CRO 服务", "CDMO 生产", "项目交付"], "downstream": ["Biotech 客户", "药企客户", "注册申报"]},
+    ),
+    "medical_devices": _semantic_quality_override(
+        [("Imaging equipment", "影像设备"), ("Consumables", "医用耗材"), ("IVD", "体外诊断"), ("Surgical devices", "手术器械"), ("Homecare devices", "家用医疗设备")],
+        {"upstream": ["Components", "Medical materials", "Regulatory standards"], "midstream": ["Device design", "Manufacturing", "Quality control"], "downstream": ["Hospitals", "Clinics", "Homecare users"]},
+        {"upstream": ["零部件", "医用材料", "监管标准"], "midstream": ["器械设计", "生产制造", "质量控制"], "downstream": ["医院", "诊所", "家庭用户"]},
+    ),
+    "biotechnology": _semantic_quality_override(
+        [("Gene therapy", "基因治疗"), ("Cell therapy", "细胞治疗"), ("Antibody drugs", "抗体药物"), ("Research tools", "科研工具"), ("Platform technologies", "平台技术")],
+        {"upstream": ["Biology research", "Lab resources", "Clinical resources"], "midstream": ["Platform development", "Clinical validation", "Manufacturing process"], "downstream": ["Pharma partners", "Hospitals", "Patients"]},
+        {"upstream": ["生物学研究", "实验资源", "临床资源"], "midstream": ["平台开发", "临床验证", "生产工艺"], "downstream": ["药企合作方", "医院", "患者"]},
+    ),
+    "ai_healthcare": _semantic_quality_override(
+        [("AI diagnosis", "AI 诊断"), ("Clinical workflow", "临床流程"), ("Medical imaging AI", "医学影像 AI"), ("Drug discovery AI", "AI 药物发现"), ("Hospital software", "医院软件")],
+        {"upstream": ["Medical data", "Algorithms", "Clinical validation"], "midstream": ["Software products", "Workflow integration", "Regulatory review"], "downstream": ["Hospitals", "Doctors", "Patients"]},
+        {"upstream": ["医疗数据", "算法模型", "临床验证"], "midstream": ["软件产品", "流程集成", "监管审评"], "downstream": ["医院", "医生", "患者"]},
+    ),
+    "chemicals": _semantic_quality_override(
+        [("Basic chemicals", "基础化工"), ("Specialty chemicals", "精细化工"), ("Agrochemicals", "农化"), ("Materials chemicals", "材料化工"), ("Chemical distribution", "化工流通")],
+        {"upstream": ["Crude oil", "Coal", "Natural gas", "Minerals"], "midstream": ["Chemical production", "Processing", "Inventory management"], "downstream": ["Agriculture", "Manufacturing", "Consumer goods"]},
+        {"upstream": ["原油", "煤炭", "天然气", "矿产"], "midstream": ["化工生产", "加工制造", "库存管理"], "downstream": ["农业", "制造业", "消费品"]},
+    ),
+    "cement": _semantic_quality_override(
+        [("Clinker", "熟料"), ("Cement", "水泥"), ("Ready-mix concrete", "商混"), ("Aggregates", "骨料"), ("Regional producers", "区域水泥企业")],
+        {"upstream": ["Limestone", "Coal", "Electricity"], "midstream": ["Clinker production", "Cement grinding", "Concrete mixing"], "downstream": ["Infrastructure", "Real estate construction", "Rural construction"]},
+        {"upstream": ["石灰石", "煤炭", "电力"], "midstream": ["熟料生产", "水泥粉磨", "商混搅拌"], "downstream": ["基建", "房地产施工", "农村建设"]},
+    ),
+    "shipping": _semantic_quality_override(
+        [("Container shipping", "集装箱航运"), ("Dry bulk", "干散货"), ("Oil tankers", "油运"), ("LNG shipping", "LNG 航运"), ("Shipping services", "航运服务")],
+        {"upstream": ["Ships", "Fuel", "Port capacity"], "midstream": ["Fleet operation", "Route scheduling", "Freight pricing"], "downstream": ["Exporters", "Importers", "Commodity traders"]},
+        {"upstream": ["船舶", "燃料", "港口能力"], "midstream": ["船队运营", "航线调度", "运价管理"], "downstream": ["出口商", "进口商", "大宗商品贸易商"]},
+    ),
+    "ports": _semantic_quality_override(
+        [("Container terminals", "集装箱码头"), ("Bulk terminals", "散货码头"), ("Oil terminals", "油品码头"), ("Port logistics", "港口物流"), ("Free-trade zones", "保税区")],
+        {"upstream": ["Berths", "Yard capacity", "Handling equipment"], "midstream": ["Port operation", "Cargo handling", "Customs services"], "downstream": ["Shipping companies", "Exporters", "Importers"]},
+        {"upstream": ["泊位", "堆场能力", "装卸设备"], "midstream": ["港口运营", "货物装卸", "通关服务"], "downstream": ["航运公司", "出口商", "进口商"]},
+    ),
+    "logistics": _semantic_quality_override(
+        [("Express delivery", "快递"), ("Freight logistics", "货运物流"), ("Cold-chain logistics", "冷链物流"), ("Warehousing", "仓储"), ("Supply-chain services", "供应链服务")],
+        {"upstream": ["Warehouses", "Vehicles", "Labor"], "midstream": ["Sorting", "Transportation", "Route management"], "downstream": ["E-commerce merchants", "Manufacturers", "Consumers"]},
+        {"upstream": ["仓库", "车辆", "人力"], "midstream": ["分拣", "运输", "线路管理"], "downstream": ["电商商家", "制造企业", "消费者"]},
+    ),
+    "defense": _semantic_quality_override(
+        [("Aircraft systems", "航空装备"), ("Missile systems", "导弹系统"), ("Defense electronics", "军工电子"), ("Shipbuilding", "舰船装备"), ("Aerospace components", "航天配套")],
+        {"upstream": ["Special alloys", "Electronic components", "Precision parts"], "midstream": ["Subsystem manufacturing", "Final assembly", "Testing and delivery"], "downstream": ["Defense customers", "Aerospace programs", "Maintenance demand"]},
+        {"upstream": ["特种合金", "电子元器件", "精密零部件"], "midstream": ["分系统制造", "总装集成", "测试交付"], "downstream": ["国防客户", "航天项目", "维修保障需求"]},
+    ),
+}
+
+industryTrendData = [
+    {**record, **SEMANTIC_QUALITY_OVERRIDES.get(record["id"], {})}
+    for record in industryTrendData
+]
+
 MEMORY_DETAIL = {
     "id": "memory",
     "name": "Memory",
