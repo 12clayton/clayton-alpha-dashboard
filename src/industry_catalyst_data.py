@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.industry_trend_data import industryTrendData
+
 
 EVENT_TYPE_LABELS = {
     "zh": {
@@ -122,6 +124,15 @@ CATALYST_GUIDE = {
         },
     },
 }
+
+EVENT_TYPE_LABELS["zh"]["consumer_demand"] = "消费需求"
+CATALYST_GUIDE["zh"]["event_types"]["消费需求"] = (
+    "消费需求事件指客流、复购、消费场景、渠道动销、用户活跃度或服务需求变化。它通常用于观察终端需求是否改善。"
+)
+CATALYST_GUIDE["en"]["event_types"]["Consumer Demand"] = (
+    "Consumer-demand events refer to traffic, repeat purchases, consumption scenarios, channel activity, "
+    "user engagement, or service demand changes. They help observe whether end demand is improving."
+)
 
 
 INDUSTRY_CATALYST_DATA: dict[str, dict[str, Any]] = {
@@ -447,6 +458,306 @@ INDUSTRY_CATALYST_DATA: dict[str, dict[str, Any]] = {
         ],
     },
 }
+
+
+CATALYST_PROFILE_BY_CATEGORY = {
+    "Technology Growth": {
+        "score": 6.8,
+        "level": "High",
+        "direction": "Stable",
+        "summary": "{name} catalysts focus on technology cycles, product validation, capex visibility, and supply-chain execution.",
+        "summaryZh": "{nameZh}催化主要关注技术周期、产品验证、资本开支可见度与供应链执行。",
+        "events": [
+            (
+                "technology",
+                "Technology route validation remains important",
+                "技术路线验证仍是重要线索",
+                "mixed",
+                "The framework tracks technical progress and commercial validation as catalyst inputs.",
+                "框架关注技术进展与商业化验证作为催化输入。",
+            ),
+            (
+                "capex",
+                "Capex visibility supports demand monitoring",
+                "资本开支可见度支撑需求观察",
+                "positive",
+                "Infrastructure and enterprise spending are used as framework clues for demand strength.",
+                "基础设施与企业支出被作为需求强度的框架线索。",
+            ),
+        ],
+    },
+    "New Energy & Manufacturing": {
+        "score": 5.9,
+        "level": "Medium",
+        "direction": "Mixed",
+        "summary": "{name} catalysts focus on policy support, order visibility, capacity digestion, and price-cycle repair.",
+        "summaryZh": "{nameZh}催化主要关注政策支持、订单可见度、产能消化与价格周期修复。",
+        "events": [
+            (
+                "policy",
+                "Policy and project visibility remain key variables",
+                "政策与项目可见度仍是关键变量",
+                "mixed",
+                "The framework tracks policy signals and project timelines as catalysts for manufacturing demand.",
+                "框架将政策信号与项目节奏作为制造需求的催化线索。",
+            ),
+            (
+                "price_cycle",
+                "Price-cycle repair remains a validation item",
+                "价格周期修复仍是验证项",
+                "mixed",
+                "Pricing, inventory, and utilization are monitored as validation variables.",
+                "价格、库存与产能利用率被作为验证变量观察。",
+            ),
+        ],
+    },
+    "Commodities": {
+        "score": 6.4,
+        "level": "Medium",
+        "direction": "Stable",
+        "summary": "{name} catalysts focus on macro expectations, supply constraints, price cycles, and geopolitical risk.",
+        "summaryZh": "{nameZh}催化主要关注宏观预期、供给约束、价格周期与地缘政治风险。",
+        "events": [
+            (
+                "macro",
+                "Macro expectations remain a core catalyst input",
+                "宏观预期仍是核心催化输入",
+                "mixed",
+                "The framework tracks rates, currency, and growth expectations as commodity catalyst variables.",
+                "框架将利率、汇率与增长预期作为资源品催化变量。",
+            ),
+            (
+                "price_cycle",
+                "Supply-demand balance drives price-cycle monitoring",
+                "供需平衡驱动价格周期观察",
+                "mixed",
+                "Inventory, output, and demand gaps are used to monitor price-cycle risk.",
+                "库存、产量与需求缺口被用于观察价格周期风险。",
+            ),
+        ],
+    },
+    "Consumer": {
+        "score": 5.6,
+        "level": "Medium",
+        "direction": "Mixed",
+        "summary": "{name} catalysts focus on consumer demand, product cycles, channel activity, and macro sensitivity.",
+        "summaryZh": "{nameZh}催化主要关注消费需求、产品周期、渠道活跃度与宏观敏感度。",
+        "events": [
+            (
+                "consumer_demand",
+                "End-demand repair is the main framework clue",
+                "终端需求修复是主要框架线索",
+                "mixed",
+                "Traffic, channel activity, and user engagement are monitored as demand indicators.",
+                "客流、渠道动销与用户活跃度被作为需求指标观察。",
+            ),
+            (
+                "earnings",
+                "Margin and revenue validation remain important",
+                "利润率与收入验证仍然重要",
+                "neutral",
+                "Operating data is used to check whether demand signals translate into results.",
+                "经营数据用于观察需求信号是否转化为业绩结果。",
+            ),
+        ],
+    },
+    "Financial & Real Estate": {
+        "score": 5.7,
+        "level": "Medium",
+        "direction": "Mixed",
+        "summary": "{name} catalysts focus on rates, policy, regulation, asset quality, and valuation sensitivity.",
+        "summaryZh": "{nameZh}催化主要关注利率、政策、监管、资产质量与估值敏感度。",
+        "events": [
+            (
+                "macro",
+                "Rate and liquidity expectations remain central",
+                "利率与流动性预期仍是核心变量",
+                "mixed",
+                "The framework tracks rate sensitivity and liquidity as financial-cycle catalysts.",
+                "框架将利率敏感度与流动性作为金融周期催化变量。",
+            ),
+            (
+                "regulation",
+                "Regulatory signals shape risk premiums",
+                "监管信号影响风险溢价",
+                "neutral",
+                "Policy and regulatory changes may affect competitive rules and valuation conditions.",
+                "政策与监管变化可能影响竞争规则与估值环境。",
+            ),
+        ],
+    },
+    "Healthcare": {
+        "score": 6.1,
+        "level": "Medium",
+        "direction": "Stable",
+        "summary": "{name} catalysts focus on regulation, product milestones, clinical validation, and policy review.",
+        "summaryZh": "{nameZh}催化主要关注监管、产品节点、临床验证与政策审查。",
+        "events": [
+            (
+                "product",
+                "Product milestones remain key framework inputs",
+                "产品节点仍是关键框架输入",
+                "mixed",
+                "The framework tracks approvals, launches, and validation timelines as catalyst clues.",
+                "框架将审批、发布与验证节奏作为催化线索。",
+            ),
+            (
+                "regulation",
+                "Regulatory review affects validation timing",
+                "监管审查影响验证节奏",
+                "neutral",
+                "Review rules and policy changes may affect commercialization and risk perception.",
+                "审查规则与政策变化可能影响商业化节奏和风险认知。",
+            ),
+        ],
+    },
+    "Cyclical & Industrial": {
+        "score": 5.8,
+        "level": "Medium",
+        "direction": "Mixed",
+        "summary": "{name} catalysts focus on price cycles, orders, macro demand, supply chains, and policy visibility.",
+        "summaryZh": "{nameZh}催化主要关注价格周期、订单、宏观需求、供应链与政策可见度。",
+        "events": [
+            (
+                "price_cycle",
+                "Price-cycle and utilization signals remain important",
+                "价格周期与开工信号仍然重要",
+                "mixed",
+                "The framework tracks pricing, utilization, and inventory as cyclical validation inputs.",
+                "框架将价格、开工率与库存作为周期验证输入。",
+            ),
+            (
+                "order",
+                "Order visibility supports demand validation",
+                "订单可见度支撑需求验证",
+                "neutral",
+                "Backlog, shipments, and project progress are used as demand clues.",
+                "订单积压、出货与项目进度被作为需求线索。",
+            ),
+        ],
+    },
+}
+
+
+CATALYST_SCORE_OVERRIDES = {
+    "cloud_computing": (7.0, "High", "Stable"),
+    "data_center": (7.6, "High", "Rising"),
+    "cybersecurity": (6.7, "High", "Stable"),
+    "consumer_electronics": (5.8, "Medium", "Mixed"),
+    "robotics": (7.2, "High", "Rising"),
+    "battery": (5.9, "Medium", "Mixed"),
+    "energy_storage": (6.4, "Medium", "Stable"),
+    "wind_power": (5.4, "Medium", "Mixed"),
+    "power_equipment": (6.6, "High", "Stable"),
+    "industrial_automation": (6.2, "Medium", "Stable"),
+    "aluminum": (5.8, "Medium", "Mixed"),
+    "lithium": (5.6, "Medium", "Mixed"),
+    "rare_earth": (6.5, "Medium", "Stable"),
+    "natural_gas": (6.2, "Medium", "Mixed"),
+    "coal": (5.3, "Medium", "Stable"),
+    "liquor": (5.2, "Medium", "Stable"),
+    "food_beverage": (5.4, "Medium", "Stable"),
+    "tourism": (5.9, "Medium", "Mixed"),
+    "hotel": (5.6, "Medium", "Mixed"),
+    "aviation": (6.0, "Medium", "Mixed"),
+    "gaming": (6.1, "Medium", "Stable"),
+    "e_commerce": (6.3, "Medium", "Stable"),
+    "insurance": (5.8, "Medium", "Stable"),
+    "brokerage": (6.1, "Medium", "Mixed"),
+    "reits": (5.5, "Medium", "Mixed"),
+    "innovative_drugs": (6.7, "High", "Stable"),
+    "cxo": (5.8, "Medium", "Mixed"),
+    "medical_devices": (6.0, "Medium", "Stable"),
+    "biotechnology": (6.4, "Medium", "Mixed"),
+    "ai_healthcare": (6.8, "High", "Rising"),
+    "chemicals": (5.7, "Medium", "Mixed"),
+    "cement": (4.9, "Medium", "Stable"),
+    "shipping": (6.0, "Medium", "Mixed"),
+    "ports": (5.5, "Medium", "Stable"),
+    "logistics": (5.8, "Medium", "Stable"),
+}
+
+
+def _make_framework_event(
+    *,
+    date: str,
+    event_type: str,
+    title: str,
+    title_zh: str,
+    impact: str,
+    description: str,
+    description_zh: str,
+) -> dict[str, str]:
+    return {
+        "date": date,
+        "title": title,
+        "titleZh": title_zh,
+        "event_type": event_type,
+        "event_typeZh": EVENT_TYPE_LABELS["zh"].get(event_type, event_type),
+        "impact": impact,
+        "impactZh": IMPACT_LABELS["zh"].get(impact, impact),
+        "confidence": "medium",
+        "confidenceZh": CONFIDENCE_LABELS["zh"].get("medium", "中"),
+        "description": description,
+        "descriptionZh": description_zh,
+    }
+
+
+def _build_category_catalyst_record(industry: dict[str, Any]) -> dict[str, Any]:
+    profile = CATALYST_PROFILE_BY_CATEGORY.get(industry.get("category"), CATALYST_PROFILE_BY_CATEGORY["Cyclical & Industrial"])
+    score, level, direction = CATALYST_SCORE_OVERRIDES.get(
+        industry["id"],
+        (profile["score"], profile["level"], profile["direction"]),
+    )
+    name = str(industry.get("name", industry["id"]))
+    name_zh = str(industry.get("chineseName", name))
+    events = []
+    for index, (event_type, title, title_zh, impact, description, description_zh) in enumerate(profile["events"]):
+        events.append(
+            _make_framework_event(
+                date=f"2026-05-{27 - index:02d}",
+                event_type=event_type,
+                title=f"{name}: {title}",
+                title_zh=f"{name_zh}：{title_zh}",
+                impact=impact,
+                description=description,
+                description_zh=description_zh,
+            )
+        )
+    return {
+        "heat_score": score,
+        "heat_level": level,
+        "heat_direction": direction,
+        "summary": profile["summary"].format(name=name),
+        "summaryZh": profile["summaryZh"].format(nameZh=name_zh),
+        "events": events,
+    }
+
+
+def _ensure_minimum_events(industry_id: str, payload: dict[str, Any], industry: dict[str, Any]) -> None:
+    if len(payload.get("events", [])) >= 2:
+        return
+    fallback = _build_category_catalyst_record(industry)
+    existing_types = {event.get("event_type") for event in payload.get("events", [])}
+    for event in fallback["events"]:
+        if event.get("event_type") in existing_types and len(fallback["events"]) > 1:
+            continue
+        payload.setdefault("events", []).append(event)
+        if len(payload["events"]) >= 2:
+            return
+    while len(payload.get("events", [])) < 2:
+        payload.setdefault("events", []).append(fallback["events"][0].copy())
+
+
+def _complete_all_catalyst_data() -> None:
+    for industry in industryTrendData:
+        industry_id = industry["id"]
+        if industry_id not in INDUSTRY_CATALYST_DATA:
+            INDUSTRY_CATALYST_DATA[industry_id] = _build_category_catalyst_record(industry)
+        _ensure_minimum_events(industry_id, INDUSTRY_CATALYST_DATA[industry_id], industry)
+
+
+_complete_all_catalyst_data()
 
 
 def get_catalyst_data(industry_id: str) -> dict[str, Any] | None:

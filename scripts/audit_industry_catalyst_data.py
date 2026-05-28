@@ -49,23 +49,50 @@ ENGLISH_RESIDUE_PATTERNS = [
     "capacity focus",
 ]
 
+ALLOWED_EVENT_TYPES = {
+    "policy",
+    "earnings",
+    "order",
+    "capex",
+    "technology",
+    "macro",
+    "supply_chain",
+    "price_cycle",
+    "regulation",
+    "geopolitical",
+    "product",
+    "consumer_demand",
+}
+
+ALLOWED_IMPACTS = {"positive", "neutral", "negative", "mixed"}
+ALLOWED_CONFIDENCE = {"high", "medium", "low"}
+
 
 def main() -> int:
     known_ids = {record["id"] for record in industryTrendData}
     missing_fields = []
+    missing_industries = []
     unknown_industries = []
     english_residue = []
+    enum_issues = []
     guide_issues = audit_catalyst_guide()
+
+    for record in industryTrendData:
+        if record["id"] not in INDUSTRY_CATALYST_DATA:
+            missing_industries.append(record["id"])
 
     for industry_id, payload in INDUSTRY_CATALYST_DATA.items():
         if industry_id not in known_ids:
             unknown_industries.append(industry_id)
 
         missing = missing_top_fields(payload)
+        if not isinstance(payload.get("events"), list) or len(payload.get("events", [])) < 2:
+            missing.append("events[min_2]")
         for index, event in enumerate(payload.get("events", [])):
             for field in REQUIRED_EVENT_FIELDS:
                 if not event.get(field):
                     missing.append(f"events[{index}].{field}")
+            enum_issues.extend(validate_event_enums(industry_id, index, event))
         if missing:
             missing_fields.append({"id": industry_id, "missing": missing})
 
@@ -74,12 +101,14 @@ def main() -> int:
             english_residue.append({"id": industry_id, "patterns": residues})
 
     print_report("CATALYST INDUSTRIES", sorted(INDUSTRY_CATALYST_DATA))
+    print_report("INDUSTRIES MISSING CATALYST DATA", missing_industries)
     print_report("UNKNOWN INDUSTRY IDS", unknown_industries)
     print_report("MISSING CATALYST FIELDS", missing_fields)
+    print_report("CATALYST ENUM ISSUES", enum_issues)
     print_report("ENGLISH RESIDUE IN ZH FIELDS", english_residue)
     print_report("CATALYST GUIDE ISSUES", guide_issues)
 
-    return 1 if unknown_industries or missing_fields or english_residue or guide_issues else 0
+    return 1 if missing_industries or unknown_industries or missing_fields or enum_issues or english_residue or guide_issues else 0
 
 
 def missing_top_fields(payload: dict) -> list[str]:
@@ -105,6 +134,17 @@ def find_english_residue(payload: dict) -> list[str]:
     return residues
 
 
+def validate_event_enums(industry_id: str, index: int, event: dict) -> list[str]:
+    issues = []
+    if event.get("event_type") not in ALLOWED_EVENT_TYPES:
+        issues.append(f"{industry_id}.events[{index}].event_type={event.get('event_type')}")
+    if event.get("impact") not in ALLOWED_IMPACTS:
+        issues.append(f"{industry_id}.events[{index}].impact={event.get('impact')}")
+    if event.get("confidence") not in ALLOWED_CONFIDENCE:
+        issues.append(f"{industry_id}.events[{index}].confidence={event.get('confidence')}")
+    return issues
+
+
 def audit_catalyst_guide() -> list[str]:
     issues = []
     required_languages = ["zh", "en"]
@@ -128,7 +168,7 @@ def audit_catalyst_guide() -> list[str]:
         for section in required_sections:
             if not guide.get(section):
                 issues.append(f"{lang}.{section}")
-        if len(guide.get("event_types", {})) < 11:
+        if len(guide.get("event_types", {})) < 12:
             issues.append(f"{lang}.event_types incomplete")
         if len(guide.get("impact", {})) < 4:
             issues.append(f"{lang}.impact incomplete")
