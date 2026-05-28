@@ -8,6 +8,11 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+try:
+    import plotly.express as px
+except Exception:  # pragma: no cover - optional chart dependency fallback
+    px = None
+
 from src.industry_market_data import (
     EXPLICIT_NO_MARKET_MAPPING,
     INDUSTRY_MARKET_TICKERS,
@@ -15,6 +20,7 @@ from src.industry_market_data import (
 )
 from src.industry_radar_history import (
     load_latest_snapshot_lookup,
+    load_snapshot_history,
     load_watchlist,
     save_snapshot,
     snapshot_summary,
@@ -59,6 +65,19 @@ RADAR_TEXT = {
         "snapshot_files": "快照文件",
         "snapshot_dir": "保存目录",
         "no_snapshots": "暂无历史快照",
+        "charts_title": "行业雷达图表",
+        "charts_note": "图表基于当前雷达数据生成。",
+        "price_top10": "价格确认 Top 10",
+        "relative_top10": "相对强弱 Top 10",
+        "ma50_top10": "MA50 广度 Top 10",
+        "watchlist_history": "Watchlist 历史",
+        "no_chart_data": "暂无可用图表数据。",
+        "not_enough_history": "历史快照不足。请先保存至少两次不同日期的雷达快照，以查看趋势变化。",
+        "chart_industry": "行业",
+        "chart_price_score": "市场价格确认分",
+        "chart_relative_strength": "相对强弱",
+        "chart_ma50": "MA50 比例",
+        "chart_date": "快照日期",
         "columns": {
             "industry": "行业",
             "category": "分类",
@@ -103,6 +122,19 @@ RADAR_TEXT = {
         "snapshot_files": "Snapshot Files",
         "snapshot_dir": "Snapshot Directory",
         "no_snapshots": "No historical snapshots yet",
+        "charts_title": "Industry Radar Charts",
+        "charts_note": "Charts are generated from the current radar dataset.",
+        "price_top10": "Price Confirmation Top 10",
+        "relative_top10": "Relative Strength Top 10",
+        "ma50_top10": "MA50 Breadth Top 10",
+        "watchlist_history": "Watchlist History",
+        "no_chart_data": "No chart data available.",
+        "not_enough_history": "Not enough historical snapshots. Save at least two snapshots on different dates to view trend changes.",
+        "chart_industry": "Industry",
+        "chart_price_score": "Market Price Confirmation Score",
+        "chart_relative_strength": "Relative Strength",
+        "chart_ma50": "MA50 Ratio",
+        "chart_date": "Snapshot Date",
         "columns": {
             "industry": "Industry",
             "category": "Category",
@@ -145,6 +177,7 @@ def render_industry_radar_page(lang: str) -> None:
     filtered_records = filter_radar_records(radar_records, lang, watchlist)
 
     render_snapshot_controls(radar_records, filtered_records, lang)
+    render_radar_charts(filtered_records, watchlist, lang)
     render_snapshot_expander(lang)
     render_trend_status_guide(lang)
     render_radar_table(filtered_records, lang)
@@ -359,6 +392,130 @@ def render_snapshot_controls(
             mime="text/csv",
             width="stretch",
         )
+
+
+def render_radar_charts(records: list[dict[str, Any]], watchlist: set[str], lang: str) -> None:
+    """Render chart tabs from the already-built radar records."""
+
+    text = RADAR_TEXT[lang]
+    st.markdown(f"### {text['charts_title']}")
+    st.caption(text["charts_note"])
+    tab_price, tab_relative, tab_ma50, tab_history = st.tabs(
+        [
+            text["price_top10"],
+            text["relative_top10"],
+            text["ma50_top10"],
+            text["watchlist_history"],
+        ]
+    )
+    with tab_price:
+        render_top10_bar(records, "market_price_confirmation_score", text["chart_price_score"], lang, percent=False)
+    with tab_relative:
+        render_top10_bar(records, "relative_strength", text["chart_relative_strength"], lang, percent=True)
+    with tab_ma50:
+        render_top10_bar(records, "ma50_ratio", text["chart_ma50"], lang, percent=True)
+    with tab_history:
+        render_watchlist_history_chart(watchlist, lang)
+
+
+def render_top10_bar(
+    records: list[dict[str, Any]],
+    metric_key: str,
+    metric_label: str,
+    lang: str,
+    *,
+    percent: bool,
+) -> None:
+    """Render one Top 10 horizontal bar chart."""
+
+    text = RADAR_TEXT[lang]
+    rows = []
+    for record in records:
+        raw = record["raw"]
+        if raw.get("v3_status") != "available":
+            continue
+        value = _to_float(raw.get(metric_key))
+        if value is None:
+            continue
+        chart_value = value * 100 if percent else value
+        rows.append(
+            {
+                text["chart_industry"]: record["display"]["industry"],
+                metric_label: chart_value,
+                "text_value": f"{chart_value:.1f}%" if percent else f"{chart_value:.1f}",
+            }
+        )
+    if not rows:
+        st.info(text["no_chart_data"])
+        return
+    frame = pd.DataFrame(rows).sort_values(metric_label, ascending=False).head(10)
+    if px is None:
+        st.bar_chart(frame, x=text["chart_industry"], y=metric_label)
+        return
+    fig = px.bar(
+        frame,
+        x=metric_label,
+        y=text["chart_industry"],
+        orientation="h",
+        text="text_value",
+        labels={metric_label: metric_label, text["chart_industry"]: text["chart_industry"]},
+    )
+    fig.update_layout(height=max(360, 34 * len(frame) + 120), margin=dict(l=10, r=20, t=20, b=20))
+    fig.update_yaxes(autorange="reversed")
+    fig.update_traces(textposition="outside", cliponaxis=False)
+    st.plotly_chart(fig, width="stretch")
+
+
+def render_watchlist_history_chart(watchlist: set[str], lang: str) -> None:
+    """Render watchlist history from local snapshot CSV files."""
+
+    text = RADAR_TEXT[lang]
+    history = load_snapshot_history()
+    required = {"snapshot_date", "industry_id", "market_price_confirmation_score"}
+    if history.empty or not required.issubset(history.columns):
+        st.info(text["not_enough_history"])
+        return
+    history = history[history["industry_id"].astype(str).isin(watchlist)].copy()
+    history["market_price_confirmation_score"] = pd.to_numeric(
+        history["market_price_confirmation_score"],
+        errors="coerce",
+    )
+    history = history.dropna(subset=["snapshot_date", "market_price_confirmation_score"])
+    if history["snapshot_date"].nunique() < 2:
+        st.info(text["not_enough_history"])
+        return
+    label_source = "chinese_name" if lang == "zh" and "chinese_name" in history.columns else "industry_name"
+    if label_source not in history.columns:
+        label_source = "industry_id"
+    history[text["chart_industry"]] = history[label_source].fillna(history["industry_id"]).astype(str)
+    history[text["chart_date"]] = pd.to_datetime(history["snapshot_date"], errors="coerce")
+    history = history.dropna(subset=[text["chart_date"]]).sort_values(text["chart_date"])
+    if history.empty:
+        st.info(text["no_chart_data"])
+        return
+    if px is None:
+        pivot = history.pivot_table(
+            index=text["chart_date"],
+            columns=text["chart_industry"],
+            values="market_price_confirmation_score",
+            aggfunc="last",
+        )
+        st.line_chart(pivot)
+        return
+    fig = px.line(
+        history,
+        x=text["chart_date"],
+        y="market_price_confirmation_score",
+        color=text["chart_industry"],
+        markers=True,
+        labels={
+            text["chart_date"]: text["chart_date"],
+            "market_price_confirmation_score": text["chart_price_score"],
+            text["chart_industry"]: text["chart_industry"],
+        },
+    )
+    fig.update_layout(height=420, margin=dict(l=10, r=20, t=20, b=20))
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_snapshot_expander(lang: str) -> None:
