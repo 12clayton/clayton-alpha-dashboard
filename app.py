@@ -24,7 +24,6 @@ from src.news_digest import analyze_manual_news, save_manual_news_note
 from src.daily_tactical_engine import TacticalInputs, daily_tactical_engine
 from src.fund_nav_provider import get_latest_fund_navs_for_funds, normalize_fund_code
 from src.gold_defense_engine import evaluate_gold_defense
-from src.industry_trend_page import render_industry_trend_search_page
 from src.public_data_loader import (
     PUBLIC_TICKERS,
     build_public_asset_table,
@@ -131,10 +130,7 @@ def main() -> None:
 
     selected_page = render_sidebar(profile, report_date, app_mode)
     render_mode_banner(app_mode)
-    if selected_page == "Industry Trend Search Engine":
-        render_industry_trend_notice()
-    else:
-        render_top_action_bar(app_mode)
+    render_top_action_bar(app_mode)
 
     if selected_page == "首页 / 今日驾驶舱":
         render_home_page(profile, portfolio, policy, asset_table, dca_table, latest_report, report_date, market_status, app_mode, final_decision, news_items)
@@ -157,8 +153,6 @@ def main() -> None:
         render_portfolio_xray_page(portfolio, app_mode)
     elif selected_page == "行业研究 / Clayton Theme Research":
         render_theme_research_page(portfolio, asset_table, news_items, final_decision, app_mode)
-    elif selected_page == "Industry Trend Search Engine":
-        render_industry_trend_search_page()
     elif selected_page == "黄金仓位进度":
         render_gold_progress_page(portfolio, policy, app_mode)
     elif selected_page == "市场图表与阶段收益":
@@ -803,7 +797,6 @@ def render_sidebar(profile: dict, report_date: str, app_mode: dict) -> str:
         "当前持仓结构",
         "组合 X-Ray",
         "行业研究 / Clayton Theme Research",
-        "Industry Trend Search Engine",
         "主题暴露分析",
         "黄金仓位进度",
         "回撤风险仪表盘",
@@ -820,7 +813,6 @@ def render_sidebar(profile: dict, report_date: str, app_mode: dict) -> str:
             "策略回测 / 模型研究",
             "组合 X-Ray",
             "行业研究 / Clayton Theme Research",
-            "Industry Trend Search Engine",
             "主题暴露分析",
             "黄金仓位进度",
             "回撤风险仪表盘",
@@ -838,12 +830,8 @@ def render_sidebar(profile: dict, report_date: str, app_mode: dict) -> str:
         st.caption(f"当前报告日期：{report_date}")
         st.caption(f"系统版本：{profile['app_version']}")
         st.divider()
-        if selected_page == "Industry Trend Search Engine":
-            st.info("仅用于行业趋势研究和风险观察，不提供交易动作判断。")
-            st.caption("V1 + V2 使用 mock data，不连接外部服务。")
-        else:
-            st.warning("仅供研究观察，不构成投资建议")
-            st.caption("不自动交易，不连接券商账户。")
+        st.warning("仅供研究观察，不构成投资建议")
+        st.caption("不自动交易，不连接券商账户。")
     return selected_page
 
 
@@ -866,13 +854,6 @@ def render_top_action_bar(app_mode: dict) -> None:
             st.button("重新生成报告", disabled=True, help="Public 模式禁止运行 main.py")
     with col2:
         st.caption("本系统仅用于研究观察、风险提示和定投辅助，不构成投资建议；不自动交易，不连接券商账户。")
-
-
-def render_industry_trend_notice() -> None:
-    """Render a neutral notice for the industry trend page."""
-
-    st.caption("Industry Trend Search Engine 当前为 mock-data skeleton，仅展示行业趋势、热度、确认度与风险信号。")
-
 
 def render_home_page(
     profile: dict,
