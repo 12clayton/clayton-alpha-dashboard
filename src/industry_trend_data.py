@@ -802,6 +802,113 @@ industryTrendData = [
     for record in industryTrendData
 ]
 
+LIQUOR_DATA_OVERRIDE = {
+    "categoryZh": "消费 / 白酒",
+    "status": "Diverging",
+    "trendStage": "Stage 2: Trend Confirmation",
+    "trendStageZh": "第二阶段：趋势确认",
+    "trendScore": 5.8,
+    "marketConfirmation": 5.4,
+    "fundamentalValidation": 5.7,
+    "valuationPressure": 6.1,
+    "heatLevel": "Moderate",
+    "overview": (
+        "Liquor is tracked as a consumer-demand and channel-inventory theme, with premium demand, "
+        "wholesale price stability, banquet activity, and brand concentration as the main framework inputs."
+    ),
+    "overviewZh": "白酒作为消费需求与渠道库存主题进行观察，重点关注高端需求、批价稳定性、宴席场景、商务消费和品牌集中度。",
+    "summary": (
+        "Liquor remains in a neutral framework stage. Demand recovery, channel inventory, and wholesale "
+        "price stability are the main variables for trend confirmation."
+    ),
+    "summaryZh": "白酒处于中性趋势确认观察阶段，需求修复、渠道库存和批价稳定性是判断趋势质量的核心变量。",
+    "keyDrivers": [
+        {
+            "name": "Premium liquor demand",
+            "nameZh": "高端酒需求",
+            "status": "Moderate",
+            "explanation": "Premium demand is used to observe the resilience of higher-end consumption scenarios.",
+            "explanationZh": "高端酒需求用于观察较高端消费场景的韧性。",
+        },
+        {
+            "name": "Channel inventory",
+            "nameZh": "渠道库存",
+            "status": "Diverging",
+            "explanation": "Distributor inventory changes affect shipment rhythm and channel confidence.",
+            "explanationZh": "经销渠道库存变化会影响出货节奏和渠道信心。",
+        },
+        {
+            "name": "Wholesale price stability",
+            "nameZh": "批价稳定性",
+            "status": "Moderate",
+            "explanation": "Wholesale price stability is an important clue for channel health.",
+            "explanationZh": "批价稳定性是观察渠道健康度的重要线索。",
+        },
+        {
+            "name": "Banquet and business consumption",
+            "nameZh": "宴席与商务消费",
+            "status": "Moderate",
+            "explanation": "Banquet and business consumption scenarios influence demand visibility.",
+            "explanationZh": "宴席与商务消费场景影响需求可见度。",
+        },
+        {
+            "name": "Brand concentration",
+            "nameZh": "品牌集中度",
+            "status": "Moderate-Strong",
+            "explanation": "Brand concentration affects pricing power and demand resilience.",
+            "explanationZh": "品牌集中度影响定价能力和需求韧性。",
+        },
+    ],
+    "subSectors": [
+        {"name": "Premium baijiu", "nameZh": "高端白酒", "status": "Moderate-Strong"},
+        {"name": "Sub-premium baijiu", "nameZh": "次高端白酒", "status": "Diverging"},
+        {"name": "Regional brands", "nameZh": "区域酒", "status": "Moderate"},
+        {"name": "Mass-market liquor", "nameZh": "大众酒", "status": "Stable"},
+        {"name": "Distribution channels", "nameZh": "经销渠道", "status": "Diverging"},
+    ],
+    "industryChain": {
+        "upstream": ["Grain", "Packaging materials", "Fermentation starters", "Base liquor"],
+        "midstream": ["Liquor production", "Brand operation", "Channel distribution", "Inventory management"],
+        "downstream": ["Banquet consumption", "Business consumption", "Gift demand", "Personal consumption"],
+    },
+    "industryChainZh": {
+        "upstream": ["粮食", "包装材料", "酒曲", "基酒"],
+        "midstream": ["白酒生产", "品牌运营", "渠道分销", "库存管理"],
+        "downstream": ["宴席消费", "商务消费", "礼赠需求", "个人消费"],
+    },
+    "catalysts": [
+        "Banquet consumption recovery",
+        "Wholesale price stabilization",
+        "Channel inventory digestion",
+        "Brand concentration changes",
+    ],
+    "catalystsZh": [
+        "宴席消费修复",
+        "批价企稳",
+        "渠道库存消化",
+        "品牌集中度变化",
+    ],
+    "riskSignals": [
+        "Wholesale price decline",
+        "Rising channel inventory",
+        "Weaker-than-expected consumption recovery",
+        "Marketing expense pressure",
+        "Policy or business-consumption constraints",
+    ],
+    "riskSignalsZh": [
+        "批价下行",
+        "渠道库存升高",
+        "消费修复不及预期",
+        "费用投放压力",
+        "政策或商务消费约束",
+    ],
+}
+
+industryTrendData = [
+    {**record, **LIQUOR_DATA_OVERRIDE} if record["id"] == "liquor" else record
+    for record in industryTrendData
+]
+
 MEMORY_DETAIL = {
     "id": "memory",
     "name": "Memory",
