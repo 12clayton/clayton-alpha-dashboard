@@ -34,6 +34,14 @@ INDUSTRY_MARKET_TICKERS = {
         "leaders": ["NVDA", "AMD", "TSM", "AVGO", "ASML"],
         "benchmark": "QQQ",
     },
+    "memory": {
+        "etfs": ["SOXX", "SMH"],
+        "leaders": ["MU", "WDC", "STX", "SSNLF", "005930.KS", "000660.KS"],
+        "benchmark": "QQQ",
+        "no_dedicated_etf": True,
+        "proxy_note_key": "memory_proxy_note",
+        "unstable_tickers": ["SSNLF"],
+    },
     "cpo_optical_module": {
         "etfs": [],
         "leaders": ["ANET", "AVGO", "MRVL", "COHR", "LITE"],

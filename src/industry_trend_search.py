@@ -18,6 +18,15 @@ EXACT_ALIAS_PRIORITY = {
         "cxo": "cxo",
         "cro": "cxo",
         "cdmo": "cxo",
+        "存储": "memory",
+        "存储芯片": "memory",
+        "存储器": "memory",
+        "hbm": "memory",
+        "dram": "memory",
+        "nand": "memory",
+        "memory": "memory",
+        "memorychip": "memory",
+        "enterprisessd": "memory",
     }.items()
 }
 

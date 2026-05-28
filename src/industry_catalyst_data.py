@@ -757,6 +757,69 @@ def _complete_all_catalyst_data() -> None:
         _ensure_minimum_events(industry_id, INDUSTRY_CATALYST_DATA[industry_id], industry)
 
 
+INDUSTRY_CATALYST_DATA["memory"] = {
+    "heat_score": 7.7,
+    "heat_level": "High",
+    "heat_direction": "Mixed",
+    "summary": "Memory catalyst tracking focuses on HBM demand, DRAM / NAND pricing, enterprise SSD demand, and supplier capex discipline.",
+    "summaryZh": "存储芯片催化框架重点观察 HBM 需求、DRAM / NAND 价格周期、企业级 SSD 需求和存储厂商资本开支纪律。",
+    "events": [
+        {
+            "date": "2026-05-27",
+            "title": "HBM demand remains tied to AI accelerator cycles",
+            "titleZh": "HBM 需求仍与 AI 加速器周期高度相关",
+            "event_type": "technology",
+            "event_typeZh": "技术",
+            "impact": "positive",
+            "impactZh": "正面",
+            "confidence": "medium",
+            "confidenceZh": "中",
+            "description": "The local framework treats HBM qualification and capacity progress as a key signal for high-end memory demand.",
+            "descriptionZh": "本地框架将 HBM 验证与产能进度作为观察高端存储需求的重要线索。",
+        },
+        {
+            "date": "2026-05-26",
+            "title": "DRAM and NAND pricing cycle remains a core variable",
+            "titleZh": "DRAM 与 NAND 价格周期仍是核心变量",
+            "event_type": "price_cycle",
+            "event_typeZh": "价格周期",
+            "impact": "mixed",
+            "impactZh": "混合",
+            "confidence": "medium",
+            "confidenceZh": "中",
+            "description": "Memory pricing can strengthen or weaken by product tier, inventory position, and customer demand.",
+            "descriptionZh": "存储价格会随产品层级、库存位置和客户需求变化而增强或转弱。",
+        },
+        {
+            "date": "2026-05-25",
+            "title": "Enterprise SSD demand provides a data-center demand signal",
+            "titleZh": "企业级 SSD 需求提供数据中心需求线索",
+            "event_type": "order",
+            "event_typeZh": "订单",
+            "impact": "positive",
+            "impactZh": "正面",
+            "confidence": "medium",
+            "confidenceZh": "中",
+            "description": "Enterprise SSD activity is used as a framework signal for storage upgrades in data centers.",
+            "descriptionZh": "企业级 SSD 活跃度被用于观察数据中心存储升级需求。",
+        },
+        {
+            "date": "2026-05-24",
+            "title": "Supplier capex discipline affects later-cycle supply risk",
+            "titleZh": "存储厂商资本开支纪律影响后续供给风险",
+            "event_type": "capex",
+            "event_typeZh": "资本开支",
+            "impact": "mixed",
+            "impactZh": "混合",
+            "confidence": "medium",
+            "confidenceZh": "中",
+            "description": "Capacity expansion pace can affect supply discipline and future pricing conditions.",
+            "descriptionZh": "产能扩张节奏会影响供给纪律和后续价格环境。",
+        },
+    ],
+}
+
+
 _complete_all_catalyst_data()
 
 

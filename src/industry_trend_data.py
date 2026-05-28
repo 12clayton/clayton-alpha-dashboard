@@ -802,6 +802,148 @@ industryTrendData = [
     for record in industryTrendData
 ]
 
+MEMORY_DETAIL = {
+    "id": "memory",
+    "name": "Memory",
+    "chineseName": "存储芯片",
+    "category": "Technology Growth",
+    "categoryZh": "科技成长 / 半导体 / 存储芯片",
+    "aliases": [
+        "memory",
+        "memory chip",
+        "DRAM",
+        "NAND",
+        "HBM",
+        "storage chip",
+        "enterprise SSD",
+        "存储",
+        "存储芯片",
+        "存储器",
+        "动态随机存储器",
+        "闪存",
+        "高带宽内存",
+        "企业级 SSD",
+    ],
+    "status": "Diverging",
+    "trendStage": "Stage 4: High-heat Divergence",
+    "trendStageZh": "第四阶段：高热分化",
+    "trendScore": 7.4,
+    "heatLevel": "High",
+    "marketConfirmation": 7.2,
+    "fundamentalValidation": 6.8,
+    "valuationPressure": 7.1,
+    "macroSensitivity": 6.6,
+    "overview": (
+        "Memory is an independent semiconductor cycle theme covering HBM, DRAM, NAND, enterprise SSD, "
+        "and controller demand. AI server memory density supports higher-end demand, while pricing, "
+        "inventory, capacity, and capex cycles can create meaningful dispersion."
+    ),
+    "overviewZh": (
+        "存储芯片是半导体周期中的独立主题，覆盖 HBM、DRAM、NAND、企业级 SSD 和控制器需求。"
+        "AI 服务器内存容量提升支撑高端需求，但价格、库存、产能和资本开支周期也会带来波动和分化。"
+    ),
+    "summary": (
+        "Memory is in a high-heat divergence stage: HBM and high-end DRAM are supported by AI compute demand, "
+        "while NAND, enterprise SSD, and broader memory pricing still need cycle validation."
+    ),
+    "summaryZh": (
+        "存储芯片处于高热分化阶段：HBM 与高端 DRAM 受 AI 算力需求支撑，"
+        "但 NAND、企业级 SSD 和整体存储价格仍需要周期验证。"
+    ),
+    "trendStageExplanation": (
+        "The stage reflects elevated attention around HBM and AI servers, combined with cyclical divergence "
+        "across memory products and suppliers."
+    ),
+    "trendStageExplanationZh": (
+        "该阶段反映 HBM 与 AI 服务器带来的高关注度，同时也体现不同存储产品和厂商之间的周期分化。"
+    ),
+    "keyDrivers": [
+        {
+            "name": "HBM demand growth",
+            "nameZh": "HBM 需求增长",
+            "status": "Strong",
+            "explanation": "High-bandwidth memory remains closely linked to AI accelerator and server demand.",
+            "explanationZh": "高带宽内存与 AI 加速器和服务器需求高度相关，是当前高端存储验证的重要线索。",
+        },
+        {
+            "name": "AI server memory density",
+            "nameZh": "AI 服务器内存容量提升",
+            "status": "Strong",
+            "explanation": "Higher model and inference workloads increase memory capacity and bandwidth requirements.",
+            "explanationZh": "模型训练与推理负载提升，带动服务器内存容量和带宽需求上升。",
+        },
+        {
+            "name": "DRAM / NAND price cycle",
+            "nameZh": "DRAM / NAND 价格周期",
+            "status": "Diverging",
+            "explanation": "Pricing recovery can vary by product tier, inventory position, and customer segment.",
+            "explanationZh": "价格修复会受到产品层级、库存位置和客户结构影响，行业内部容易出现分化。",
+        },
+        {
+            "name": "Enterprise SSD demand",
+            "nameZh": "企业级 SSD 需求",
+            "status": "Moderate-Strong",
+            "explanation": "Data center storage upgrades provide a second demand layer beyond HBM.",
+            "explanationZh": "数据中心存储升级为 HBM 之外提供第二层需求线索。",
+        },
+        {
+            "name": "Memory capex changes",
+            "nameZh": "存储厂商资本开支变化",
+            "status": "Moderate",
+            "explanation": "Capacity plans influence supply discipline and later-cycle pricing risk.",
+            "explanationZh": "产能规划会影响供给纪律，并影响后续价格周期风险。"
+        },
+    ],
+    "subSectors": [
+        {"name": "HBM", "nameZh": "HBM", "status": "Strong"},
+        {"name": "DRAM", "nameZh": "DRAM", "status": "Diverging"},
+        {"name": "NAND Flash", "nameZh": "NAND 闪存", "status": "Recovering"},
+        {"name": "Enterprise SSD", "nameZh": "企业级 SSD", "status": "Moderate-Strong"},
+        {"name": "Memory Controller", "nameZh": "存储控制器", "status": "Moderate"},
+        {"name": "Packaging / Advanced Packaging", "nameZh": "封装 / 先进封装", "status": "Strong"},
+    ],
+    "industryChain": {
+        "upstream": ["Semiconductor equipment", "Materials", "Wafers", "EDA"],
+        "midstream": ["DRAM", "NAND", "HBM", "Enterprise SSD", "Controllers"],
+        "downstream": ["AI servers", "Data centers", "Consumer electronics", "Automotive electronics", "Enterprise storage"],
+    },
+    "industryChainZh": {
+        "upstream": ["半导体设备", "材料", "硅片", "EDA"],
+        "midstream": ["DRAM", "NAND", "HBM", "企业级 SSD", "控制器"],
+        "downstream": ["AI 服务器", "数据中心", "消费电子", "汽车电子", "企业存储"],
+    },
+    "catalysts": [
+        "HBM capacity and qualification progress",
+        "DRAM / NAND pricing recovery",
+        "Enterprise SSD demand changes",
+        "Memory supplier capex discipline",
+    ],
+    "catalystsZh": [
+        "HBM 产能与验证进度",
+        "DRAM / NAND 价格修复",
+        "企业级 SSD 需求变化",
+        "存储厂商资本开支纪律",
+    ],
+    "riskSignals": [
+        "Memory price pullback",
+        "Inventory cycle reversal",
+        "Overly rapid capex expansion",
+        "AI server demand below expectations",
+        "Margin pressure from stronger competition",
+    ],
+    "riskSignalsZh": [
+        "存储价格回落",
+        "库存周期反转",
+        "资本开支过快扩张",
+        "AI 服务器需求低于预期",
+        "竞争加剧导致利润率压力",
+    ],
+}
+
+if not any(record["id"] == "memory" for record in industryTrendData):
+    insert_index = next((index + 1 for index, record in enumerate(industryTrendData) if record["id"] == "semiconductor"), 1)
+    industryTrendData.insert(insert_index, MEMORY_DETAIL)
+
 CHINESE_NAME_OVERRIDES = {
     "semiconductor": "半导体",
     "cpo_optical_module": "CPO / 光模块",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,7 @@ import streamlit as st
 
 RADAR_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "industry_radar"
 WATCHLIST_PATH = RADAR_DATA_DIR / "watchlist.json"
+LATEST_RADAR_PATH = RADAR_DATA_DIR / "latest_radar.csv"
 DEFAULT_WATCHLIST = [
     "semiconductor",
     "cpo_optical_module",
@@ -68,6 +69,37 @@ def save_snapshot(snapshot_rows: list[dict[str, Any]], snapshot_date: date | Non
     path = RADAR_DATA_DIR / f"radar_snapshot_{current_date:%Y-%m-%d}.csv"
     pd.DataFrame(snapshot_rows).to_csv(path, index=False, encoding="utf-8-sig")
     return path
+
+
+def save_latest_radar(snapshot_rows: list[dict[str, Any]]) -> Path:
+    """Save the latest radar cache used for fast default page loads."""
+
+    ensure_radar_data_dir()
+    pd.DataFrame(snapshot_rows).to_csv(LATEST_RADAR_PATH, index=False, encoding="utf-8-sig")
+    return LATEST_RADAR_PATH
+
+
+def load_latest_radar_frame() -> pd.DataFrame:
+    """Load the latest radar cache without creating network work."""
+
+    ensure_radar_data_dir()
+    if not LATEST_RADAR_PATH.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(LATEST_RADAR_PATH)
+    except Exception:
+        return pd.DataFrame()
+
+
+def latest_radar_updated_at() -> str:
+    """Return the latest radar cache file mtime as a readable timestamp."""
+
+    if not LATEST_RADAR_PATH.exists():
+        return ""
+    try:
+        return datetime.fromtimestamp(LATEST_RADAR_PATH.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ""
 
 
 def list_snapshot_files() -> list[Path]:

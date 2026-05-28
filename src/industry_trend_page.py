@@ -17,7 +17,10 @@ from src.industry_catalyst_data import (
     get_catalyst_data,
     localized_label,
 )
+from src.industry_export import build_industry_export_context, build_industry_json, build_industry_markdown
 from src.industry_market_data import get_market_confirmation_data
+from src.industry_news_provider import read_industry_news, refresh_industry_news
+from src.industry_overall_view import OVERALL_TEXT, compute_overall_view, format_overall_score
 from src.industry_trend_data import INDUSTRY_CATEGORIES
 from src.industry_trend_search import find_industry_trend
 
@@ -43,6 +46,7 @@ TEXT = {
         "no_market_mapping": "当前行业尚未配置 V3 市场价格代理样本，因此暂不展示实时市场价格确认数据。当前仍展示 V1/V2 模拟框架。",
         "cpo_note": "CPO / Optical Module 暂无专用 ETF，本模块使用代表性公司作为价格代理样本。",
         "cxo_proxy_note": "CXO 暂无专用 ETF，本模块使用生命科学服务与医药外包代表公司作为价格代理样本。",
+        "memory_proxy_note": "存储芯片暂无纯粹专用 ETF，本模块使用半导体 ETF 和代表性存储公司作为价格代理样本。",
         "wind_power_proxy_note": "风电使用全球风电 ETF 与代表公司作为价格代理，部分 OTC ticker 可能不稳定。",
         "proxy_note": "当前行业使用代表性公司组合作为市场价格代理。",
         "sic_proxy_note": "SiC 暂无专用 ETF，本模块使用代表性功率半导体公司作为价格代理样本。",
@@ -117,6 +121,7 @@ TEXT = {
         "no_market_mapping": "This industry does not yet have a configured V3 market-price proxy set. The page is currently showing the V1/V2 mock framework only.",
         "cpo_note": "CPO / Optical Module has no dedicated ETF for now, so this module uses representative companies as price proxy samples.",
         "cxo_proxy_note": "CXO has no dedicated ETF for now, so this module uses representative life-science services and outsourcing companies as price proxy samples.",
+        "memory_proxy_note": "Memory has no pure dedicated ETF for now, so this module uses semiconductor ETFs and representative memory companies as price proxy samples.",
         "wind_power_proxy_note": "Wind power uses a global wind ETF and representative companies as price proxy samples. Some OTC tickers may be less stable.",
         "proxy_note": "This industry currently uses a representative company basket as a market-price proxy.",
         "sic_proxy_note": "SiC has no dedicated ETF for now, so this module uses representative power-semiconductor companies as price proxy samples.",
@@ -486,23 +491,35 @@ def render_industry_trend_search_page(lang: str | None = None, show_language_pic
     industry, matched = find_industry_trend(query)
     render_recognition_result(industry, matched, lang)
 
+    market_result = get_market_confirmation_data(industry.get("id", ""))
+    catalyst = get_catalyst_data(str(industry.get("id", "")))
+    live_news = read_industry_news(str(industry.get("id", "")))
     render_industry_overview(industry, lang)
-    render_trend_explanation_cards(industry, lang)
-    render_trend_stage_guide(lang, current_stage=str(industry.get("trendStage", "")))
+    render_overall_view_card(industry, market_result, catalyst, lang)
+    render_export_context(industry, market_result, catalyst, live_news, lang)
     render_score_grid(industry, lang)
-    render_live_market_confirmation(industry, lang)
-    render_news_heat_catalysts(industry, lang)
+    render_market_price_summary(industry, market_result, lang)
+    render_news_heat_summary(catalyst, live_news, lang)
 
-    left, right = st.columns([1.35, 1])
-    with left:
-        render_key_drivers(industry, lang)
-        render_industry_chain(industry, lang)
-    with right:
-        render_subsectors(industry, lang)
-        render_catalysts(industry, lang)
-        render_risk_signals(industry, lang)
-
-    render_available_universe(lang)
+    with st.expander("市场价格明细" if lang == "zh" else "Market Price Details", expanded=False):
+        render_market_price_details(industry, market_result, lang)
+    with st.expander("新闻与催化事件" if lang == "zh" else "News & Catalysts", expanded=False):
+        render_news_and_catalyst_details(industry, catalyst, live_news, lang)
+    with st.expander("产业链与风险信号" if lang == "zh" else "Industry Chain & Risk Signals", expanded=False):
+        left, right = st.columns([1.35, 1])
+        with left:
+            render_key_drivers(industry, lang)
+            render_industry_chain(industry, lang)
+        with right:
+            render_subsectors(industry, lang)
+            render_risk_signals(industry, lang)
+    with st.expander("说明 Guide" if lang == "zh" else "Guides", expanded=False):
+        render_trend_explanation_cards(industry, lang)
+        render_trend_status_guide(lang, wrap=False)
+        render_trend_stage_guide(lang, current_stage=str(industry.get("trendStage", "")), wrap=False)
+        render_catalyst_event_guide(lang, wrap=False)
+    with st.expander("开发者信息" if lang == "zh" else "Developer Details", expanded=False):
+        render_developer_details(industry, market_result, live_news, lang)
 
 
 def render_language_picker() -> str:
@@ -517,6 +534,88 @@ def render_language_picker() -> str:
             label_visibility="collapsed",
         )
     return "zh" if selection == "中文" else "en"
+
+
+def render_overall_view_card(industry: dict, market_result: dict, catalyst: dict | None, lang: str) -> None:
+    """Render a compact deterministic overall view."""
+
+    text = OVERALL_TEXT[lang]
+    price_score = market_result.get("score") if market_result.get("available") else None
+    ma50_ratio = market_result.get("above_ma50_ratio") if market_result.get("available") else None
+    heat_score = catalyst.get("heat_score") if catalyst else None
+    overall = compute_overall_view(
+        framework_trend_score=industry.get("trendScore"),
+        market_price_confirmation_score=price_score,
+        news_heat_score=heat_score,
+        valuation_pressure=industry.get("valuationPressure"),
+        fundamental_validation=industry.get("fundamentalValidation"),
+        ma50_ratio=ma50_ratio,
+        trend_stage=trend_stage_text(industry, lang),
+        lang=lang,
+    )
+    with st.container(border=True):
+        st.markdown(f"### {text['title']}")
+        c1, c2, c3, c4, c5 = st.columns([1.35, 1.35, 1, 1, 1])
+        with c1:
+            st.metric(text["overall_status"], overall["status_label"])
+        with c2:
+            st.metric(text["trend_stage"], trend_stage_text(industry, lang))
+        with c3:
+            st.metric(text["price_confirmation"], format_overall_score(price_score, lang))
+        with c4:
+            st.metric(text["news_heat"], format_overall_score(heat_score, lang))
+        with c5:
+            st.metric(text["priced_in_risk"], overall["priced_in_risk_label"])
+        st.markdown(f"**{text['key_tags']}**: {', '.join(overall['tags'])}")
+        st.markdown(f"**{text['one_line']}**: {overall['one_line']}")
+
+
+def render_export_context(
+    industry: dict,
+    market_result: dict,
+    catalyst: dict | None,
+    live_news: dict,
+    lang: str,
+) -> None:
+    """Render local Markdown / JSON export controls."""
+
+    title = "导出分析上下文" if lang == "zh" else "Export Analysis Context"
+    md_label = "复制用 Markdown" if lang == "zh" else "Copy-ready Markdown"
+    md_download = "下载 Markdown" if lang == "zh" else "Download Markdown"
+    json_download = "下载 JSON" if lang == "zh" else "Download JSON"
+    context = build_industry_export_context(
+        industry=industry,
+        market_result=market_result,
+        catalyst=catalyst,
+        live_news=live_news,
+        lang=lang,
+        trend_stage=trend_stage_text(industry, lang),
+        category=category_label(industry, lang),
+        trend_summary=build_trend_summary(industry, lang),
+    )
+    markdown_text = build_industry_markdown(context, lang)
+    json_text = build_industry_json(context)
+    industry_id = str(industry.get("id", "industry"))
+    today = pd.Timestamp.today().strftime("%Y-%m-%d")
+    with st.expander(title, expanded=False):
+        st.text_area(md_label, markdown_text, height=260)
+        left, right = st.columns(2)
+        with left:
+            st.download_button(
+                md_download,
+                data=markdown_text.encode("utf-8"),
+                file_name=f"industry_analysis_{industry_id}_{today}.md",
+                mime="text/markdown",
+                width="stretch",
+            )
+        with right:
+            st.download_button(
+                json_download,
+                data=json_text.encode("utf-8"),
+                file_name=f"industry_analysis_{industry_id}_{today}.json",
+                mime="application/json",
+                width="stretch",
+            )
 
 
 def render_industry_overview(industry: dict, lang: str) -> None:
@@ -624,7 +723,12 @@ def render_heat_card_native(heat_level: str, explanation: str, lang: str) -> Non
         st.markdown(explanation)
 
 
-def render_live_market_confirmation(industry: dict, lang: str) -> None:
+def render_live_market_confirmation(
+    industry: dict,
+    lang: str,
+    result: dict | None = None,
+    mode: str = "simple",
+) -> None:
     """Render live price-based market confirmation data."""
 
     text = TEXT[lang]
@@ -632,10 +736,10 @@ def render_live_market_confirmation(industry: dict, lang: str) -> None:
     st.markdown(text["live_intro"])
     st.caption(text["price_score_note"])
 
-    if st.button(text["refresh_market_data"], key=f"refresh_market_data_{industry.get('id', 'unknown')}"):
+    refresh_clicked = st.button(text["refresh_market_data"], key=f"refresh_market_data_{industry.get('id', 'unknown')}")
+    if refresh_clicked:
         get_market_confirmation_data.clear()
-
-    result = get_market_confirmation_data(industry.get("id", ""))
+    result = get_market_confirmation_data(industry.get("id", "")) if refresh_clicked or result is None else result
     if not result.get("available"):
         if result.get("reason_code") == "no_market_mapping":
             st.info(text["no_market_mapping"])
@@ -650,15 +754,88 @@ def render_live_market_confirmation(industry: dict, lang: str) -> None:
     elif result.get("no_dedicated_etf") or not result.get("has_etf_sample"):
         st.info(text["proxy_note"])
 
-    render_market_meta_strip(result, lang)
-    render_failure_reasons(result, lang)
+    if mode in {"detailed", "developer"}:
+        render_market_meta_strip(result, lang)
+    if mode == "developer":
+        render_failure_reasons(result, lang)
     render_live_market_metrics(industry, result, lang)
 
     details = result.get("details") or []
+    if details and mode in {"detailed", "developer"}:
+        st.dataframe(build_market_detail_table(details, lang), width="stretch", hide_index=True)
+        if mode == "developer":
+            with st.expander(text["audit_title"], expanded=False):
+                st.dataframe(build_market_audit_table(details, lang), width="stretch", hide_index=True)
+
+
+def render_market_price_summary(industry: dict, result: dict, lang: str) -> None:
+    """Render compact V3 market-price summary."""
+
+    text = TEXT[lang]
+    st.markdown(f"### {text['live_title']}")
+    if not result.get("available"):
+        if result.get("reason_code") == "no_market_mapping":
+            st.info(text["no_market_mapping"])
+        else:
+            st.info(text["live_unavailable"])
+        return
+    items = [
+        (text["price_score"], format_score(result.get("score"))),
+        (text["ma50_ratio"], format_ratio_with_count(result, "above_ma50")),
+        (text["median_3m"], format_percent(result.get("median_3m_return"))),
+        (text["relative_strength"], format_percent(result.get("relative_strength"))),
+        ("V3 状态" if lang == "zh" else "V3 Status", "正常" if lang == "zh" else "Available"),
+    ]
+    cols = st.columns(len(items))
+    for col, (label, value) in zip(cols, items):
+        with col:
+            st.metric(label, value)
+
+
+def render_market_price_details(industry: dict, result: dict, lang: str) -> None:
+    """Render ticker-level V3 market-price details."""
+
+    text = TEXT[lang]
+    if st.button(text["refresh_market_data"], key=f"refresh_market_detail_{industry.get('id', 'unknown')}"):
+        get_market_confirmation_data.clear()
+        result = get_market_confirmation_data(industry.get("id", ""))
+    if not result.get("available"):
+        st.info(text["live_unavailable"])
+        return
+    render_market_meta_strip(result, lang)
+    details = result.get("details") or []
     if details:
         st.dataframe(build_market_detail_table(details, lang), width="stretch", hide_index=True)
-        with st.expander(text["audit_title"], expanded=False):
+
+
+def render_developer_details(industry: dict, result: dict, live_news: dict, lang: str) -> None:
+    """Render folded developer diagnostics."""
+
+    if result.get("available"):
+        failures = result.get("failed_ticker_details") or []
+        if failures:
+            text = TEXT[lang]
+            rows = [
+                {
+                    text["failure_ticker"]: item.get("ticker", ""),
+                    text["failure_reason"]: failure_reason_label(item.get("reason", ""), lang),
+                    "debug": item.get("debug", ""),
+                }
+                for item in failures
+            ]
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+        details = result.get("details") or []
+        if details:
             st.dataframe(build_market_audit_table(details, lang), width="stretch", hide_index=True)
+    st.json(
+        {
+            "industry_id": industry.get("id"),
+            "market_status": "available" if result.get("available") else result.get("reason_code"),
+            "failed_tickers": result.get("failed_tickers") or [],
+            "live_news_status": live_news.get("live_news_status"),
+            "live_news_last_updated": live_news.get("live_news_last_updated"),
+        }
+    )
 
 
 CATALYST_TEXT = {
@@ -693,13 +870,18 @@ CATALYST_TEXT = {
 }
 
 
-def render_news_heat_catalysts(industry: dict, lang: str) -> None:
+def render_news_heat_catalysts(
+    industry: dict,
+    lang: str,
+    catalyst: dict | None = None,
+    mode: str = "simple",
+) -> None:
     """Render local V4.1 catalyst framework data for one industry."""
 
     text = CATALYST_TEXT[lang]
     st.markdown(f"### {text['title']}")
     st.caption(text["note"])
-    catalyst = get_catalyst_data(str(industry.get("id", "")))
+    catalyst = catalyst or get_catalyst_data(str(industry.get("id", "")))
     if not catalyst:
         st.info(text["missing"])
         return
@@ -735,35 +917,184 @@ def render_news_heat_catalysts(industry: dict, lang: str) -> None:
                 text["description"]: event.get("descriptionZh" if lang == "zh" else "description", ""),
             }
         )
-    if rows:
+    if rows and mode in {"detailed", "developer"}:
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
-    render_catalyst_event_guide(lang)
 
 
-def render_catalyst_event_guide(lang: str, title_override: str | None = None) -> None:
+def render_news_heat_summary(catalyst: dict | None, live_news: dict, lang: str) -> None:
+    """Render compact V4 heat and live-news summary."""
+
+    text = CATALYST_TEXT[lang]
+    live_text = LIVE_NEWS_TEXT[lang]
+    st.markdown(f"### {text['title']}")
+    if not catalyst:
+        st.info(text["missing"])
+        return
+    cols = st.columns(4)
+    with cols[0]:
+        st.metric(text["heat_score"], format_score(catalyst.get("heat_score")))
+    with cols[1]:
+        st.metric(text["heat_direction"], localized_label(HEAT_DIRECTION_LABELS, catalyst.get("heat_direction"), lang))
+    with cols[2]:
+        st.metric(live_text["count_7d"], str(live_news.get("live_news_count_7d", 0)))
+    with cols[3]:
+        status = str(live_news.get("live_news_status", "not_configured"))
+        st.metric(live_text["status"], live_text["statuses"].get(status, status))
+    summary_key = "summaryZh" if lang == "zh" else "summary"
+    st.markdown(str(catalyst.get(summary_key) or catalyst.get("summary") or ""))
+
+
+def render_news_and_catalyst_details(
+    industry: dict,
+    catalyst: dict | None,
+    live_news: dict,
+    lang: str,
+) -> None:
+    """Render event table, news refresh, and cached live news list."""
+
+    render_news_heat_catalysts(industry, lang, catalyst=catalyst, mode="detailed")
+    render_live_news_watch(industry, lang, cached_result=live_news, mode="detailed")
+
+
+def render_catalyst_event_guide(lang: str, title_override: str | None = None, wrap: bool = True) -> None:
     """Render the local V4.1 catalyst guide."""
 
     guide = CATALYST_GUIDE[lang]
     title = title_override or guide["title"]
-    with st.expander(title, expanded=False):
-        for section_key, section_title_key in [
-            ("event_types", "event_types_title"),
-            ("impact", "impact_title"),
-            ("confidence", "confidence_title"),
-            ("heat", "heat_title"),
-        ]:
-            st.markdown(f"**{guide[section_title_key]}**")
-            st.dataframe(
-                catalyst_guide_frame(guide[section_key], guide["columns"]),
-                width="stretch",
-                hide_index=True,
-            )
+    if wrap:
+        with st.expander(title, expanded=False):
+            render_catalyst_event_guide(lang, title_override=title_override, wrap=False)
+        return
+    st.markdown(f"**{title}**")
+    for section_key, section_title_key in [
+        ("event_types", "event_types_title"),
+        ("impact", "impact_title"),
+        ("confidence", "confidence_title"),
+        ("heat", "heat_title"),
+    ]:
+        st.markdown(f"**{guide[section_title_key]}**")
+        st.dataframe(
+            catalyst_guide_frame(guide[section_key], guide["columns"]),
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def catalyst_guide_frame(items: dict[str, str], columns: dict[str, str]) -> pd.DataFrame:
     """Build a two-column guide dataframe."""
 
     return pd.DataFrame([{columns["item"]: key, columns["meaning"]: value} for key, value in items.items()])
+
+
+LIVE_NEWS_TEXT = {
+    "zh": {
+        "title": "实时新闻观察（V4.2 Lite）",
+        "note": "V4.2 仅展示公开新闻抓取结果，用于辅助观察行业热度，不代表完整研究结论。",
+        "unavailable": "实时新闻暂不可用，当前仍展示 V4.1 本地催化事件框架。",
+        "refresh": "刷新新闻数据",
+        "source": "数据源",
+        "updated": "更新时间",
+        "count_7d": "最近 7 天新闻数量",
+        "latest": "最新新闻时间",
+        "status": "实时新闻状态",
+        "cache_missing": "暂无缓存新闻。请点击刷新新闻数据。",
+        "no_high_relevance": "暂无高相关实时新闻。",
+        "time": "时间",
+        "title_col": "标题",
+        "publisher": "来源",
+        "tickers": "相关代码",
+        "keywords": "匹配关键词",
+        "link": "链接",
+        "na": "暂无",
+        "statuses": {
+            "available": "可用",
+            "no_recent_news": "暂无近期新闻",
+            "fetch_failed": "抓取失败",
+            "not_configured": "未配置",
+        },
+    },
+    "en": {
+        "title": "Live News Watch (V4.2 Lite)",
+        "note": "V4.2 displays public news fetch results for heat monitoring only. It does not represent a full research conclusion.",
+        "unavailable": "Live news is currently unavailable. The page is still showing the V4.1 local catalyst framework.",
+        "refresh": "Refresh News Data",
+        "source": "Data Source",
+        "updated": "Updated",
+        "count_7d": "7D News Count",
+        "latest": "Latest News Time",
+        "status": "Live News Status",
+        "cache_missing": "No cached news yet. Use Refresh News Data.",
+        "no_high_relevance": "No high-relevance live news available.",
+        "time": "Time",
+        "title_col": "Title",
+        "publisher": "Source",
+        "tickers": "Related Tickers",
+        "keywords": "Matched Keywords",
+        "link": "Link",
+        "na": "N/A",
+        "statuses": {
+            "available": "available",
+            "no_recent_news": "no_recent_news",
+            "fetch_failed": "fetch_failed",
+            "not_configured": "not_configured",
+        },
+    },
+}
+
+
+def render_live_news_watch(
+    industry: dict,
+    lang: str,
+    cached_result: dict | None = None,
+    mode: str = "simple",
+) -> None:
+    """Render V4.2 cached live-news watch module."""
+
+    text = LIVE_NEWS_TEXT[lang]
+    st.markdown(f"### {text['title']}")
+    st.caption(text["note"])
+    if st.button(text["refresh"], key=f"refresh_news_{industry.get('id')}", width="content"):
+        news_result = refresh_industry_news(industry)
+    else:
+        news_result = cached_result or read_industry_news(str(industry.get("id", "")))
+
+    status = str(news_result.get("live_news_status", "not_configured"))
+    if status == "fetch_failed":
+        st.info(text["unavailable"])
+    elif news_result.get("failed_reason") == "cache_missing":
+        st.info(text["cache_missing"])
+
+    cols = st.columns(4)
+    values = [
+        (text["source"], news_result.get("source") or "Yahoo Finance"),
+        (text["updated"], news_result.get("live_news_last_updated") or text["na"]),
+        (text["count_7d"], str(news_result.get("live_news_count_7d", 0))),
+        (text["latest"], news_result.get("latest_news_time") or text["na"]),
+    ]
+    for col, (label, value) in zip(cols, values):
+        with col:
+            st.metric(label, value)
+    st.caption(f"{text['status']}: {text['statuses'].get(status, status)}")
+
+    if mode == "simple":
+        return
+
+    rows = []
+    for item in (news_result.get("items") or [])[:5]:
+        rows.append(
+            {
+                text["time"]: item.get("published_at", ""),
+                text["title_col"]: item.get("title", ""),
+                text["publisher"]: item.get("publisher", ""),
+                text["tickers"]: ", ".join(item.get("related_tickers", [])),
+                text["keywords"]: ", ".join(item.get("matched_keywords", [])),
+                text["link"]: item.get("link", ""),
+            }
+        )
+    if rows:
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    else:
+        st.info(text["no_high_relevance"])
 
 
 def render_market_meta_strip(result: dict, lang: str) -> None:
@@ -1159,7 +1490,7 @@ def trend_stage_info(stage: str, lang: str) -> dict[str, str]:
     return TREND_STAGE_EXPLANATIONS[lang].get(stage, {"label": label, "explanation": "N/A"})
 
 
-def render_trend_status_guide(lang: str) -> None:
+def render_trend_status_guide(lang: str, wrap: bool = True) -> None:
     """Render a compact trend status guide table."""
 
     headings = {
@@ -1175,11 +1506,15 @@ def render_trend_status_guide(lang: str) -> None:
         }
         for info in TREND_STATUS_EXPLANATIONS[lang].values()
     ]
-    with st.expander(title, expanded=False):
-        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    if wrap:
+        with st.expander(title, expanded=False):
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+        return
+    st.markdown(f"**{title}**")
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
-def render_trend_stage_guide(lang: str, current_stage: str | None = None) -> None:
+def render_trend_stage_guide(lang: str, current_stage: str | None = None, wrap: bool = True) -> None:
     """Render the full 1-6 trend lifecycle guide."""
 
     headings = {
@@ -1197,8 +1532,12 @@ def render_trend_stage_guide(lang: str, current_stage: str | None = None) -> Non
                 meaning_col: item["meaning"],
             }
         )
-    with st.expander(title, expanded=False):
-        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    if wrap:
+        with st.expander(title, expanded=False):
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+        return
+    st.markdown(f"**{title}**")
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 def category_label(industry: dict, lang: str) -> str:
