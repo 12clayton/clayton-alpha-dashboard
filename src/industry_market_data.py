@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
+import logging
 from dataclasses import dataclass
 from datetime import datetime
+from time import sleep
 from typing import Any
 
 import pandas as pd
@@ -13,6 +17,15 @@ try:
     import yfinance as yf
 except Exception:  # pragma: no cover - runtime fallback when optional market package is absent
     yf = None
+
+
+DEBUG_MARKET_DATA = False
+DOWNLOAD_FAILURE_DEBUG: dict[str, str] = {}
+
+for logger_name in ("yfinance", "peewee"):
+    market_logger = logging.getLogger(logger_name)
+    market_logger.setLevel(logging.CRITICAL)
+    market_logger.propagate = False
 
 
 INDUSTRY_MARKET_TICKERS = {
@@ -63,6 +76,7 @@ INDUSTRY_MARKET_TICKERS = {
         "benchmark": "QQQ",
         "no_dedicated_etf": True,
         "proxy_note_key": "sic_proxy_note",
+        "unstable_tickers": ["ROHM"],
     },
     "ev": {
         "etfs": ["DRIV", "IDRV", "KARS"],
@@ -161,6 +175,7 @@ INDUSTRY_MARKET_TICKERS = {
         "leaders": ["BTU", "ARCH", "CEIX", "HCC"],
         "benchmark": "SPY",
         "no_dedicated_etf": True,
+        "unstable_tickers": ["ARCH", "CEIX"],
     },
     "natural_gas": {
         "etfs": ["UNG", "FCG"],
@@ -171,6 +186,7 @@ INDUSTRY_MARKET_TICKERS = {
         "etfs": ["LIT"],
         "leaders": ["ALB", "SQM", "LAC", "PLL", "SGML"],
         "benchmark": "SPY",
+        "unstable_tickers": ["PLL"],
     },
     "rare_earth": {
         "etfs": ["REMX"],
@@ -192,6 +208,7 @@ INDUSTRY_MARKET_TICKERS = {
         "leaders": ["AAPL", "SONY", "SSNLF", "PCRFY", "GRMN"],
         "benchmark": "QQQ",
         "no_dedicated_etf": True,
+        "unstable_tickers": ["PCRFY"],
     },
     "cybersecurity": {
         "etfs": ["CIBR", "HACK", "BUG"],
@@ -315,13 +332,22 @@ def get_market_confirmation_data(industry_id: str) -> dict[str, Any]:
             "no_dedicated_etf": bool(mapping.get("no_dedicated_etf", not mapping["etfs"])),
             "proxy_note_key": mapping.get("proxy_note_key"),
         }
+        unstable_tickers = set(mapping.get("unstable_tickers", []))
         if close_prices.empty:
             return _result(
                 available=False,
                 message="No price data returned.",
                 reason_code="market_data_failed",
                 failed_tickers=tickers,
-                failed_ticker_details=[{"ticker": ticker, "reason": "empty data"} for ticker in tickers],
+                failed_ticker_details=[
+                    {
+                        "ticker": ticker,
+                        "reason": normalize_failure_reason("empty data"),
+                        "debug": DOWNLOAD_FAILURE_DEBUG.get(ticker, "empty data"),
+                        "unstable": ticker in unstable_tickers,
+                    }
+                    for ticker in tickers
+                ],
                 **base_meta,
             )
 
@@ -332,16 +358,28 @@ def get_market_confirmation_data(industry_id: str) -> dict[str, Any]:
             if metrics:
                 details.append(metrics)
             else:
+                raw_reason = diagnose_ticker_failure(close_prices.get(ticker))
                 failed_ticker_details.append(
-                    {"ticker": ticker, "reason": diagnose_ticker_failure(close_prices.get(ticker))}
+                    {
+                        "ticker": ticker,
+                        "reason": normalize_failure_reason(raw_reason),
+                        "debug": DOWNLOAD_FAILURE_DEBUG.get(ticker, raw_reason),
+                        "unstable": ticker in unstable_tickers,
+                    }
                 )
         valid_tickers = {row["ticker"] for row in details}
         failed_tickers = [ticker for ticker in tickers if ticker not in valid_tickers]
         benchmark_metrics = build_ticker_metrics(benchmark, close_prices.get(benchmark), sample_type="Benchmark")
         if not details or not benchmark_metrics:
             if not benchmark_metrics:
+                raw_reason = diagnose_ticker_failure(close_prices.get(benchmark))
                 failed_ticker_details.append(
-                    {"ticker": benchmark, "reason": diagnose_ticker_failure(close_prices.get(benchmark))}
+                    {
+                        "ticker": benchmark,
+                        "reason": normalize_failure_reason(raw_reason),
+                        "debug": DOWNLOAD_FAILURE_DEBUG.get(benchmark, raw_reason),
+                        "unstable": benchmark in unstable_tickers,
+                    }
                 )
             return _result(
                 available=False,
@@ -380,7 +418,7 @@ def download_close_prices(tickers: list[str]) -> pd.DataFrame:
     if not tickers or yf is None:
         return pd.DataFrame()
     try:
-        data = yf.download(
+        data = quiet_yfinance_download(
             tickers=tickers,
             period="1y",
             interval="1d",
@@ -388,12 +426,48 @@ def download_close_prices(tickers: list[str]) -> pd.DataFrame:
             progress=False,
             threads=True,
         )
-    except Exception:
+    except Exception as exc:
+        for ticker in tickers:
+            DOWNLOAD_FAILURE_DEBUG[ticker] = str(exc)
         return pd.DataFrame()
     if data.empty:
+        for ticker in tickers:
+            DOWNLOAD_FAILURE_DEBUG.setdefault(ticker, "Yahoo Finance returned no price data")
         return pd.DataFrame()
     close = extract_close_frame(data, tickers)
     return close.dropna(how="all")
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def download_single_close_prices(ticker: str) -> pd.DataFrame:
+    """Download one ticker through the same cached, quiet path."""
+
+    return download_close_prices([ticker])
+
+
+def quiet_yfinance_download(**kwargs: Any) -> pd.DataFrame:
+    """Run yfinance download without leaking raw provider output to the terminal."""
+
+    if yf is None:
+        return pd.DataFrame()
+    stdout_buffer = io.StringIO()
+    stderr_buffer = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
+            data = yf.download(**kwargs)
+    finally:
+        captured = "\n".join(
+            value for value in [stdout_buffer.getvalue().strip(), stderr_buffer.getvalue().strip()] if value
+        )
+        if captured:
+            tickers = kwargs.get("tickers", [])
+            if isinstance(tickers, str):
+                tickers = [tickers]
+            for ticker in tickers:
+                DOWNLOAD_FAILURE_DEBUG[str(ticker)] = captured
+            if DEBUG_MARKET_DATA:
+                print(captured)
+    return data
 
 
 def extract_close_frame(data: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
@@ -423,7 +497,12 @@ def retry_missing_close_prices(close_prices: pd.DataFrame, tickers: list[str]) -
     for ticker in tickers:
         if _series_has_data(close_prices.get(ticker)):
             continue
-        retry = download_close_prices([ticker])
+        retry = download_single_close_prices(ticker)
+        if _series_has_data(retry.get(ticker)):
+            close_prices[ticker] = retry[ticker]
+            continue
+        sleep(0.5)
+        retry = download_single_close_prices(ticker)
         if _series_has_data(retry.get(ticker)):
             close_prices[ticker] = retry[ticker]
     return close_prices.dropna(how="all")
@@ -624,6 +703,23 @@ def diagnose_ticker_failure(prices: pd.Series | None) -> str:
     if len(clean) <= 21:
         return "insufficient history"
     return "metric calculation failed"
+
+
+def normalize_failure_reason(reason: object) -> str:
+    """Normalize yfinance no-data messages without implying a confirmed delisting."""
+
+    raw = str(reason or "")
+    lowered = raw.lower()
+    no_data_tokens = [
+        "possibly delisted",
+        "no price data found",
+        "no data found",
+        "empty data",
+        "missing close",
+    ]
+    if any(token in lowered for token in no_data_tokens):
+        return "yahoo_no_price_data"
+    return raw
 
 
 def _series_has_data(series: pd.Series | None) -> bool:

@@ -245,6 +245,128 @@ TREND_STAGE_LABELS_ZH = {
     "Stage 6: Trend Cooling": "第六阶段：趋势降温",
 }
 
+TREND_STATUS_EXPLANATIONS = {
+    "zh": {
+        "Strong Trend": {
+            "label": "强趋势",
+            "bias": "明显利好",
+            "explanation": "行业处于较明确的上行趋势中，价格确认、热度或框架信号较强。但如果估值压力同步升高，也需要观察是否进入高热阶段。",
+        },
+        "Trend Intact": {
+            "label": "趋势仍在",
+            "bias": "偏利好",
+            "explanation": "行业主线尚未被破坏，价格与框架信号仍支持趋势延续。相比强趋势，它更偏稳态确认。",
+        },
+        "Diverging": {
+            "label": "分化",
+            "bias": "中性偏谨慎",
+            "explanation": "行业内部开始出现强弱差异。它不等于趋势结束，但说明市场不再无差别定价，趋势可能从普遍扩散进入精选阶段。",
+        },
+        "Overheated": {
+            "label": "过热",
+            "bias": "短期风险",
+            "explanation": "市场关注度和估值压力偏高。行业趋势可能仍在，但价格层面已经反映较多乐观预期，后续波动和回撤风险上升。",
+        },
+        "Weakening": {
+            "label": "转弱",
+            "bias": "偏风险",
+            "explanation": "行业趋势开始失去价格或框架支持，可能是短期调整，也可能是趋势退潮的早期信号，需要继续观察后续是否修复。",
+        },
+        "Broken Trend": {
+            "label": "趋势破坏",
+            "bias": "明显风险",
+            "explanation": "行业趋势结构明显恶化，市场价格确认不足，框架信号偏弱。通常意味着该行业不再处于有效趋势阶段。",
+        },
+    },
+    "en": {
+        "Strong Trend": {
+            "label": "Strong Trend",
+            "bias": "Strong positive",
+            "explanation": "The industry is in a clear upward trend with strong price confirmation, heat, or framework signals. If valuation pressure rises at the same time, it may be moving toward a high-heat phase.",
+        },
+        "Trend Intact": {
+            "label": "Trend Intact",
+            "bias": "Positive",
+            "explanation": "The main industry trend has not broken. Price and framework signals still support continuation. Compared with Strong Trend, this is more of a steady confirmation state.",
+        },
+        "Diverging": {
+            "label": "Diverging",
+            "bias": "Neutral-cautious",
+            "explanation": "Internal dispersion is increasing. This does not mean the trend has ended, but the market is no longer pricing the whole industry uniformly.",
+        },
+        "Overheated": {
+            "label": "Overheated",
+            "bias": "Short-term risk",
+            "explanation": "Attention and valuation pressure are elevated. The trend may still exist, but price already reflects substantial optimism and volatility risk is higher.",
+        },
+        "Weakening": {
+            "label": "Weakening",
+            "bias": "Risk-tilted",
+            "explanation": "The industry is losing price or framework support. It may be a short-term adjustment or an early cooling signal that needs follow-up confirmation.",
+        },
+        "Broken Trend": {
+            "label": "Broken Trend",
+            "bias": "Negative",
+            "explanation": "The trend structure has deteriorated, market-price confirmation is insufficient, and framework signals are weak. The industry is usually no longer in an effective trend phase.",
+        },
+    },
+}
+
+TREND_STAGE_EXPLANATIONS = {
+    "zh": {
+        "Stage 1: Low-attention Accumulation": {
+            "label": "第一阶段：低关注酝酿",
+            "explanation": "行业有早期变化，但市场关注度不高。",
+        },
+        "Stage 2: Trend Confirmation": {
+            "label": "第二阶段：趋势确认",
+            "explanation": "龙头开始走强，市场开始确认行业逻辑。",
+        },
+        "Stage 3: Maintrend Expansion": {
+            "label": "第三阶段：主升扩散",
+            "explanation": "趋势进入主升阶段，产业链扩散和市场价格共振。",
+        },
+        "Stage 4: High-heat Divergence": {
+            "label": "第四阶段：高热分化",
+            "explanation": "热度较高，龙头可能仍强，但行业内部开始分化。",
+        },
+        "Stage 5: Overpriced Volatility": {
+            "label": "第五阶段：高估值波动",
+            "explanation": "估值压力和拥挤度较高，趋势可能仍在，但波动加大。",
+        },
+        "Stage 6: Trend Cooling": {
+            "label": "第六阶段：趋势降温",
+            "explanation": "热度、价格确认或基本面预期开始下降，趋势进入降温阶段。",
+        },
+    },
+    "en": {
+        "Stage 1: Low-attention Accumulation": {
+            "label": "Stage 1: Low-attention Accumulation",
+            "explanation": "The industry shows early changes, but market attention remains low.",
+        },
+        "Stage 2: Trend Confirmation": {
+            "label": "Stage 2: Trend Confirmation",
+            "explanation": "Leaders begin to strengthen and the market starts confirming the industry logic.",
+        },
+        "Stage 3: Maintrend Expansion": {
+            "label": "Stage 3: Maintrend Expansion",
+            "explanation": "The trend enters its main expansion phase, with industry-chain breadth and price confirmation reinforcing each other.",
+        },
+        "Stage 4: High-heat Divergence": {
+            "label": "Stage 4: High-heat Divergence",
+            "explanation": "Heat is elevated. Leaders may remain strong, but internal divergence starts to increase.",
+        },
+        "Stage 5: Overpriced Volatility": {
+            "label": "Stage 5: Overpriced Volatility",
+            "explanation": "Valuation pressure and crowding are high. The trend may still exist, but volatility increases.",
+        },
+        "Stage 6: Trend Cooling": {
+            "label": "Stage 6: Trend Cooling",
+            "explanation": "Heat, price confirmation, or fundamental expectations begin to decline, and the trend enters a cooling phase.",
+        },
+    },
+}
+
 
 def render_industry_trend_search_page(lang: str | None = None, show_language_picker: bool = True) -> None:
     """Render the industry trend search page."""
@@ -276,6 +398,7 @@ def render_industry_trend_search_page(lang: str | None = None, show_language_pic
     render_recognition_result(industry, matched, lang)
 
     render_industry_overview(industry, lang)
+    render_trend_explanation_cards(industry, lang)
     render_score_grid(industry, lang)
     render_live_market_confirmation(industry, lang)
 
@@ -334,6 +457,29 @@ def render_industry_overview(industry: dict, lang: str) -> None:
         </section>
         """
     )
+
+
+def render_trend_explanation_cards(industry: dict, lang: str) -> None:
+    """Render localized explanations for the current trend status and stage."""
+
+    status_info = trend_status_info(str(industry.get("status", "")), lang)
+    stage_info = trend_stage_info(str(industry.get("trendStage", "")), lang)
+    headings = {
+        "zh": ("趋势状态解释", "趋势阶段解释", "倾向"),
+        "en": ("Trend Status Explanation", "Trend Stage Explanation", "Bias"),
+    }
+    status_heading, stage_heading, bias_label = headings[lang]
+    left, right = st.columns(2)
+    with left:
+        with st.container(border=True):
+            st.markdown(f"**{status_heading}**")
+            st.markdown(f"{status_info['label']} · {bias_label}: {status_info['bias']}")
+            st.markdown(status_info["explanation"])
+    with right:
+        with st.container(border=True):
+            st.markdown(f"**{stage_heading}**")
+            st.markdown(stage_info["label"])
+            st.markdown(stage_info["explanation"])
 
 
 def render_score_grid(industry: dict, lang: str) -> None:
@@ -419,9 +565,9 @@ def render_live_market_confirmation(industry: dict, lang: str) -> None:
 
     details = result.get("details") or []
     if details:
-        st.dataframe(build_market_detail_table(details, lang), use_container_width=True, hide_index=True)
+        st.dataframe(build_market_detail_table(details, lang), width="stretch", hide_index=True)
         with st.expander(text["audit_title"], expanded=False):
-            st.dataframe(build_market_audit_table(details, lang), use_container_width=True, hide_index=True)
+            st.dataframe(build_market_audit_table(details, lang), width="stretch", hide_index=True)
 
 
 def render_market_meta_strip(result: dict, lang: str) -> None:
@@ -454,11 +600,12 @@ def render_failure_reasons(result: dict, lang: str) -> None:
         {
             text["failure_ticker"]: item.get("ticker", ""),
             text["failure_reason"]: failure_reason_label(item.get("reason", ""), lang),
+            "debug": item.get("debug", ""),
         }
         for item in failures
     ]
     with st.expander(text["failure_reasons"], expanded=False):
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 def render_live_market_metrics(industry: dict, result: dict, lang: str) -> None:
@@ -796,6 +943,46 @@ def translate_status(status: str, lang: str) -> str:
     return STATUS_LABELS[lang].get(str(status), str(status))
 
 
+def trend_status_info(status: str, lang: str) -> dict[str, str]:
+    """Return localized status explanation."""
+
+    return TREND_STATUS_EXPLANATIONS[lang].get(
+        status,
+        {
+            "label": translate_status(status, lang),
+            "bias": "N/A",
+            "explanation": "N/A",
+        },
+    )
+
+
+def trend_stage_info(stage: str, lang: str) -> dict[str, str]:
+    """Return localized stage explanation."""
+
+    label = trend_stage_text({"trendStage": stage}, lang)
+    return TREND_STAGE_EXPLANATIONS[lang].get(stage, {"label": label, "explanation": "N/A"})
+
+
+def render_trend_status_guide(lang: str) -> None:
+    """Render a compact trend status guide table."""
+
+    headings = {
+        "zh": ("趋势状态说明", "状态", "倾向", "解释"),
+        "en": ("Trend Status Guide", "Status", "Bias", "Explanation"),
+    }
+    title, status_col, bias_col, explanation_col = headings[lang]
+    rows = [
+        {
+            status_col: info["label"],
+            bias_col: info["bias"],
+            explanation_col: info["explanation"],
+        }
+        for info in TREND_STATUS_EXPLANATIONS[lang].values()
+    ]
+    with st.expander(title, expanded=False):
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+
 def category_label(industry: dict, lang: str) -> str:
     """Return localized category label with a theme-specific refinement."""
 
@@ -836,6 +1023,8 @@ def failure_reason_label(reason: object, lang: str) -> str:
     """Return localized failed-download reason."""
 
     raw = str(reason or "")
+    if raw == "yahoo_no_price_data":
+        return "Yahoo Finance returned no price data" if lang == "en" else "Yahoo Finance 暂时未返回价格数据"
     if lang == "en":
         return raw
     mapping = {
