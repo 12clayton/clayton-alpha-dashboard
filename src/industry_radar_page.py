@@ -13,6 +13,7 @@ try:
 except Exception:  # pragma: no cover - optional chart dependency fallback
     px = None
 
+from src.industry_catalyst_data import HEAT_DIRECTION_LABELS, get_catalyst_data, localized_label
 from src.industry_market_data import (
     EXPLICIT_NO_MARKET_MAPPING,
     INDUSTRY_MARKET_TICKERS,
@@ -32,6 +33,7 @@ from src.industry_trend_page import (
     format_percent,
     format_score,
     industry_name,
+    render_trend_stage_guide,
     render_trend_status_guide,
     translate_status,
 )
@@ -78,6 +80,9 @@ RADAR_TEXT = {
         "chart_relative_strength": "相对强弱",
         "chart_ma50": "MA50 比例",
         "chart_date": "快照日期",
+        "news_heat_top10": "新闻热度 Top 10",
+        "chart_news_heat": "新闻热度分",
+        "news_chart_note": "该数据为 V4.1 本地框架数据，不是实时新闻热度。",
         "columns": {
             "industry": "行业",
             "category": "分类",
@@ -94,6 +99,8 @@ RADAR_TEXT = {
             "price_score_change": "价格确认分变化",
             "ma50_change": "MA50 比例变化",
             "relative_strength_change": "相对强弱变化",
+            "news_heat_score": "新闻热度分",
+            "heat_direction": "热度方向",
             "sort_rank": "排序",
         },
     },
@@ -135,6 +142,9 @@ RADAR_TEXT = {
         "chart_relative_strength": "Relative Strength",
         "chart_ma50": "MA50 Ratio",
         "chart_date": "Snapshot Date",
+        "news_heat_top10": "News Heat Top 10",
+        "chart_news_heat": "News Heat Score",
+        "news_chart_note": "This is V4.1 local framework data, not live news heat.",
         "columns": {
             "industry": "Industry",
             "category": "Category",
@@ -151,6 +161,8 @@ RADAR_TEXT = {
             "price_score_change": "Price Score Change",
             "ma50_change": "MA50 Ratio Change",
             "relative_strength_change": "Relative Strength Change",
+            "news_heat_score": "News Heat Score",
+            "heat_direction": "Heat Direction",
             "sort_rank": "Sort",
         },
     },
@@ -180,6 +192,7 @@ def render_industry_radar_page(lang: str) -> None:
     render_radar_charts(filtered_records, watchlist, lang)
     render_snapshot_expander(lang)
     render_trend_status_guide(lang)
+    render_trend_stage_guide(lang)
     render_radar_table(filtered_records, lang)
     st.caption(text["hint"])
 
@@ -205,6 +218,7 @@ def build_radar_record(
     industry_id = str(industry.get("id", ""))
     raw = base_snapshot_row(industry)
     display = base_display_row(industry, lang)
+    apply_catalyst_fields(industry_id, raw, display, lang)
 
     if industry_id not in INDUSTRY_MARKET_TICKERS:
         raw["v3_status"] = "explicit_no_market_mapping" if industry_id in EXPLICIT_NO_MARKET_MAPPING else "no_market_mapping"
@@ -262,6 +276,8 @@ def base_snapshot_row(industry: dict[str, Any]) -> dict[str, Any]:
         "relative_strength": None,
         "valid_ticker_count": 0,
         "failed_tickers": "",
+        "news_heat_score": None,
+        "heat_direction": None,
     }
 
 
@@ -286,9 +302,23 @@ def base_display_row(industry: dict[str, Any], lang: str) -> dict[str, Any]:
         "price_score_change": DASH,
         "ma50_change": DASH,
         "relative_strength_change": DASH,
+        "news_heat_score": text["not_configured"],
+        "heat_direction": text["not_configured"],
         "sort_rank": 2,
         "score_sort": -1.0,
     }
+
+
+def apply_catalyst_fields(industry_id: str, raw: dict[str, Any], display: dict[str, Any], lang: str) -> None:
+    """Attach local V4.1 catalyst fields to radar rows."""
+
+    catalyst = get_catalyst_data(industry_id)
+    if not catalyst:
+        return
+    raw["news_heat_score"] = _to_float(catalyst.get("heat_score"))
+    raw["heat_direction"] = catalyst.get("heat_direction")
+    display["news_heat_score"] = _score_number(catalyst.get("heat_score"))
+    display["heat_direction"] = localized_label(HEAT_DIRECTION_LABELS, catalyst.get("heat_direction"), lang)
 
 
 def apply_change_columns(
@@ -400,11 +430,12 @@ def render_radar_charts(records: list[dict[str, Any]], watchlist: set[str], lang
     text = RADAR_TEXT[lang]
     st.markdown(f"### {text['charts_title']}")
     st.caption(text["charts_note"])
-    tab_price, tab_relative, tab_ma50, tab_history = st.tabs(
+    tab_price, tab_relative, tab_ma50, tab_news, tab_history = st.tabs(
         [
             text["price_top10"],
             text["relative_top10"],
             text["ma50_top10"],
+            text["news_heat_top10"],
             text["watchlist_history"],
         ]
     )
@@ -414,6 +445,9 @@ def render_radar_charts(records: list[dict[str, Any]], watchlist: set[str], lang
         render_top10_bar(records, "relative_strength", text["chart_relative_strength"], lang, percent=True)
     with tab_ma50:
         render_top10_bar(records, "ma50_ratio", text["chart_ma50"], lang, percent=True)
+    with tab_news:
+        st.caption(text["news_chart_note"])
+        render_top10_bar(records, "news_heat_score", text["chart_news_heat"], lang, percent=False, require_v3=False)
     with tab_history:
         render_watchlist_history_chart(watchlist, lang)
 
@@ -425,6 +459,7 @@ def render_top10_bar(
     lang: str,
     *,
     percent: bool,
+    require_v3: bool = True,
 ) -> None:
     """Render one Top 10 horizontal bar chart."""
 
@@ -432,7 +467,7 @@ def render_top10_bar(
     rows = []
     for record in records:
         raw = record["raw"]
-        if raw.get("v3_status") != "available":
+        if require_v3 and raw.get("v3_status") != "available":
             continue
         value = _to_float(raw.get(metric_key))
         if value is None:
@@ -567,6 +602,8 @@ def display_dataframe(records: list[dict[str, Any]], lang: str) -> pd.DataFrame:
         "price_score_change": columns["price_score_change"],
         "ma50_change": columns["ma50_change"],
         "relative_strength_change": columns["relative_strength_change"],
+        "news_heat_score": columns["news_heat_score"],
+        "heat_direction": columns["heat_direction"],
     }
     display_df = df.rename(columns=rename_map)
     for column in display_df.columns:

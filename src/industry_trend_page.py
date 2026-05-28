@@ -7,6 +7,15 @@ import html
 import pandas as pd
 import streamlit as st
 
+from src.industry_catalyst_data import (
+    CONFIDENCE_LABELS,
+    EVENT_TYPE_LABELS,
+    HEAT_DIRECTION_LABELS,
+    HEAT_LEVEL_LABELS,
+    IMPACT_LABELS,
+    get_catalyst_data,
+    localized_label,
+)
 from src.industry_market_data import get_market_confirmation_data
 from src.industry_trend_data import INDUSTRY_CATEGORIES
 from src.industry_trend_search import find_industry_trend
@@ -367,6 +376,85 @@ TREND_STAGE_EXPLANATIONS = {
     },
 }
 
+TREND_STAGE_GUIDE = {
+    "zh": [
+        {
+            "stage": "1",
+            "key": "Stage 1: Low-attention Accumulation",
+            "name": "第一阶段：低关注酝酿",
+            "meaning": "行业有早期变化，但市场关注度不高，价格确认通常较弱。",
+        },
+        {
+            "stage": "2",
+            "key": "Stage 2: Trend Confirmation",
+            "name": "第二阶段：趋势确认",
+            "meaning": "龙头开始走强，市场开始确认行业逻辑，价格确认和基本面验证同步增强。",
+        },
+        {
+            "stage": "3",
+            "key": "Stage 3: Maintrend Expansion",
+            "name": "第三阶段：主升扩散",
+            "meaning": "趋势进入主升阶段，产业链扩散和市场价格共振，行业关注度明显提升。",
+        },
+        {
+            "stage": "4",
+            "key": "Stage 4: High-heat Divergence",
+            "name": "第四阶段：高热分化",
+            "meaning": "热度较高，龙头可能仍强，但行业内部开始分化，估值压力上升。",
+        },
+        {
+            "stage": "5",
+            "key": "Stage 5: Overpriced Volatility",
+            "name": "第五阶段：高估值波动",
+            "meaning": "估值压力和拥挤度较高，趋势可能仍在，但价格波动和回撤风险上升。",
+        },
+        {
+            "stage": "6",
+            "key": "Stage 6: Trend Cooling",
+            "name": "第六阶段：趋势降温",
+            "meaning": "热度、价格确认或基本面预期开始下降，趋势进入降温阶段。",
+        },
+    ],
+    "en": [
+        {
+            "stage": "1",
+            "key": "Stage 1: Low-attention Accumulation",
+            "name": "Stage 1: Low-attention Accumulation",
+            "meaning": "Early industry changes are emerging, but market attention and price confirmation remain limited.",
+        },
+        {
+            "stage": "2",
+            "key": "Stage 2: Trend Confirmation",
+            "name": "Stage 2: Trend Confirmation",
+            "meaning": "Leaders start to outperform, and the market begins to validate the industry logic.",
+        },
+        {
+            "stage": "3",
+            "key": "Stage 3: Maintrend Expansion",
+            "name": "Stage 3: Maintrend Expansion",
+            "meaning": "The trend enters an expansion phase, with supply-chain diffusion and stronger market confirmation.",
+        },
+        {
+            "stage": "4",
+            "key": "Stage 4: High-heat Divergence",
+            "name": "Stage 4: High-heat Divergence",
+            "meaning": "Attention is elevated, leaders may remain strong, but internal dispersion and valuation pressure rise.",
+        },
+        {
+            "stage": "5",
+            "key": "Stage 5: Overpriced Volatility",
+            "name": "Stage 5: Overpriced Volatility",
+            "meaning": "Valuation pressure and crowding are high. The trend may still exist, but volatility risk increases.",
+        },
+        {
+            "stage": "6",
+            "key": "Stage 6: Trend Cooling",
+            "name": "Stage 6: Trend Cooling",
+            "meaning": "Attention, price confirmation, or fundamental expectations begin to decline.",
+        },
+    ],
+}
+
 
 def render_industry_trend_search_page(lang: str | None = None, show_language_picker: bool = True) -> None:
     """Render the industry trend search page."""
@@ -399,8 +487,10 @@ def render_industry_trend_search_page(lang: str | None = None, show_language_pic
 
     render_industry_overview(industry, lang)
     render_trend_explanation_cards(industry, lang)
+    render_trend_stage_guide(lang, current_stage=str(industry.get("trendStage", "")))
     render_score_grid(industry, lang)
     render_live_market_confirmation(industry, lang)
+    render_news_heat_catalysts(industry, lang)
 
     left, right = st.columns([1.35, 1])
     with left:
@@ -568,6 +658,84 @@ def render_live_market_confirmation(industry: dict, lang: str) -> None:
         st.dataframe(build_market_detail_table(details, lang), width="stretch", hide_index=True)
         with st.expander(text["audit_title"], expanded=False):
             st.dataframe(build_market_audit_table(details, lang), width="stretch", hide_index=True)
+
+
+CATALYST_TEXT = {
+    "zh": {
+        "title": "新闻热度与催化事件（V4.1 Framework）",
+        "note": "V4.1 使用本地催化事件框架数据，尚未接入实时新闻源。",
+        "missing": "当前行业尚未配置 V4.1 催化事件框架数据。",
+        "heat_score": "热度分数",
+        "heat_level": "热度等级",
+        "heat_direction": "热度方向",
+        "date": "日期",
+        "event": "事件",
+        "type": "类型",
+        "impact": "影响",
+        "confidence": "可信度",
+        "description": "说明",
+    },
+    "en": {
+        "title": "News Heat & Catalysts (V4.1 Framework)",
+        "note": "V4.1 uses local catalyst framework data and is not connected to live news yet.",
+        "missing": "This industry does not yet have V4.1 catalyst framework data configured.",
+        "heat_score": "Heat Score",
+        "heat_level": "Heat Level",
+        "heat_direction": "Heat Direction",
+        "date": "Date",
+        "event": "Event",
+        "type": "Type",
+        "impact": "Impact",
+        "confidence": "Confidence",
+        "description": "Description",
+    },
+}
+
+
+def render_news_heat_catalysts(industry: dict, lang: str) -> None:
+    """Render local V4.1 catalyst framework data for one industry."""
+
+    text = CATALYST_TEXT[lang]
+    st.markdown(f"### {text['title']}")
+    st.caption(text["note"])
+    catalyst = get_catalyst_data(str(industry.get("id", "")))
+    if not catalyst:
+        st.info(text["missing"])
+        return
+
+    cols = st.columns(3)
+    with cols[0]:
+        st.metric(text["heat_score"], format_score(catalyst.get("heat_score")))
+    with cols[1]:
+        st.metric(text["heat_level"], localized_label(HEAT_LEVEL_LABELS, catalyst.get("heat_level"), lang))
+    with cols[2]:
+        st.metric(
+            text["heat_direction"],
+            localized_label(HEAT_DIRECTION_LABELS, catalyst.get("heat_direction"), lang),
+        )
+    summary_key = "summaryZh" if lang == "zh" else "summary"
+    st.markdown(str(catalyst.get(summary_key) or catalyst.get("summary") or ""))
+
+    rows = []
+    for event in catalyst.get("events", []):
+        rows.append(
+            {
+                text["date"]: event.get("date", ""),
+                text["event"]: event.get("titleZh" if lang == "zh" else "title", ""),
+                text["type"]: event.get("event_typeZh")
+                if lang == "zh"
+                else localized_label(EVENT_TYPE_LABELS, event.get("event_type"), lang),
+                text["impact"]: event.get("impactZh")
+                if lang == "zh"
+                else localized_label(IMPACT_LABELS, event.get("impact"), lang),
+                text["confidence"]: event.get("confidenceZh")
+                if lang == "zh"
+                else localized_label(CONFIDENCE_LABELS, event.get("confidence"), lang),
+                text["description"]: event.get("descriptionZh" if lang == "zh" else "description", ""),
+            }
+        )
+    if rows:
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 def render_market_meta_strip(result: dict, lang: str) -> None:
@@ -979,6 +1147,28 @@ def render_trend_status_guide(lang: str) -> None:
         }
         for info in TREND_STATUS_EXPLANATIONS[lang].values()
     ]
+    with st.expander(title, expanded=False):
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+
+def render_trend_stage_guide(lang: str, current_stage: str | None = None) -> None:
+    """Render the full 1-6 trend lifecycle guide."""
+
+    headings = {
+        "zh": ("趋势阶段说明", "阶段", "名称", "含义", "当前阶段"),
+        "en": ("Trend Stage Guide", "Stage", "Name", "Meaning", "Current Stage"),
+    }
+    title, stage_col, name_col, meaning_col, current_label = headings[lang]
+    rows = []
+    for item in TREND_STAGE_GUIDE[lang]:
+        is_current = bool(current_stage and item["key"] == current_stage)
+        rows.append(
+            {
+                stage_col: f"{item['stage']} · {current_label}" if is_current else item["stage"],
+                name_col: item["name"],
+                meaning_col: item["meaning"],
+            }
+        )
     with st.expander(title, expanded=False):
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
