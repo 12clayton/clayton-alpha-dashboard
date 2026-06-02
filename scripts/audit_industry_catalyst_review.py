@@ -70,7 +70,35 @@ def main() -> int:
     if no_news_review.get("review_status") != "insufficient_evidence":
         issues.append("high-heat no-news review should be insufficient_evidence")
 
+    cpo_news_review = build_catalyst_review(
+        "cpo_optical_module",
+        get_catalyst_data("cpo_optical_module"),
+        {
+            "live_news_count_7d": 2,
+            "items": [
+                {
+                    "title": "Lambda highlights Nvidia CPO switch progress",
+                    "matched_keywords": ["CPO"],
+                    "relevance": "high",
+                },
+                {
+                    "title": "GlobalFoundries expands silicon photonics collaboration",
+                    "matched_keywords": ["silicon photonics"],
+                    "relevance": "medium",
+                },
+            ],
+        },
+        language="zh",
+    )
+    if cpo_news_review.get("review_status") == "insufficient_evidence":
+        issues.append("CPO keyword-matched news should not be insufficient_evidence")
+    if cpo_news_review.get("review_status") not in {"stable", "reinforced"}:
+        issues.append(f"CPO keyword-matched news should be stable or reinforced, got {cpo_news_review.get('review_status')}")
+    if not cpo_news_review.get("supported_catalysts"):
+        issues.append("CPO keyword-matched news should populate supported_catalysts")
+
     print_report("CATALYST REVIEW SAMPLE", review)
+    print_report("CPO REVIEW SAMPLE", cpo_news_review)
     print_report("CATALYST REVIEW ISSUES", issues)
     return 1 if issues else 0
 

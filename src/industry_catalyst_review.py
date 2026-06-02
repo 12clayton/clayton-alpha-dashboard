@@ -75,7 +75,10 @@ INDUSTRY_REVIEW_KEYWORDS = {
         "1.6T",
         "optical module",
         "CPO",
+        "co-packaged optics",
         "silicon photonics",
+        "Nvidia CPO",
+        "data center switch",
         "data center",
         "bandwidth",
         "光模块",
@@ -144,7 +147,7 @@ def build_catalyst_review(
     ]
     live_count = int(live_news_data.get("live_news_count_7d") or len(news_items) or 0)
     matched_keywords = collect_news_matches(news_items, keywords)
-    supported = sorted(matched_keywords)
+    supported = supported_catalysts_for(industry_id, matched_keywords, language)
     emerging = collect_emerging_keywords(news_items, keywords)
     heat_score = to_float(catalyst_data.get("heat_score"))
     heat_direction = str(catalyst_data.get("heat_direction") or "")
@@ -169,8 +172,8 @@ def build_catalyst_review(
     weak_or_missing = build_weak_or_missing(status, keywords, supported, language)
     coverage_note = coverage_note_for(status, live_count, language="en")
     coverage_note_zh = coverage_note_for(status, live_count, language="zh")
-    one_line = one_line_for(status, live_count, supported, language="en")
-    one_line_zh = one_line_for(status, live_count, supported, language="zh")
+    one_line = one_line_for(status, live_count, supported, language="en", industry_id=industry_id)
+    one_line_zh = one_line_for(status, live_count, supported, language="zh", industry_id=industry_id)
 
     return {
         "review_status": status,
@@ -221,6 +224,34 @@ def collect_news_matches(news_items: list[dict[str, Any]], keywords: list[str]) 
             if lower_keyword in title or lower_keyword in matched:
                 output.add(original)
     return output
+
+
+def supported_catalysts_for(industry_id: str, matched_keywords: set[str], language: str) -> list[str]:
+    """Map matched keywords to local catalyst clues when a theme needs explicit grouping."""
+
+    if not matched_keywords:
+        return []
+    matched_lower = {keyword.lower() for keyword in matched_keywords}
+    if industry_id == "cpo_optical_module":
+        core_terms = {
+            "cpo",
+            "co-packaged optics",
+            "optical module",
+            "silicon photonics",
+            "nvidia cpo",
+            "data center switch",
+            "800g",
+            "1.6t",
+            "bandwidth",
+        }
+        if matched_lower & core_terms:
+            label = (
+                "CPO / 光模块：技术路线验证仍是重要线索"
+                if language == "zh"
+                else "CPO / Optical Module: Technology route validation remains important"
+            )
+            return [label]
+    return sorted(matched_keywords)
 
 
 def collect_emerging_keywords(news_items: list[dict[str, Any]], review_keywords: list[str]) -> list[str]:
@@ -275,8 +306,10 @@ def coverage_note_for(status: str, live_count: int, language: str) -> str:
     return f"The review is based on {live_count} high-relevance news items."
 
 
-def one_line_for(status: str, live_count: int, supported: list[str], language: str) -> str:
+def one_line_for(status: str, live_count: int, supported: list[str], language: str, industry_id: str = "") -> str:
     if language == "zh":
+        if status == "stable" and industry_id == "cpo_optical_module":
+            return "当前实时新闻对 CPO 技术路线验证形成一定支持，但新闻数量仍有限。"
         if status == "reinforced":
             return f"实时新闻与本地催化框架形成较强呼应，已匹配 {len(supported)} 条催化关键词。"
         if status == "stable":
@@ -286,6 +319,8 @@ def one_line_for(status: str, live_count: int, supported: list[str], language: s
         if status == "weakening":
             return "新闻证据偏少或方向降温，催化线索需要后续复核。"
         return "当前高相关新闻证据不足，无法对本地催化框架形成有效复核。"
+    if status == "stable" and industry_id == "cpo_optical_module":
+        return "Live news provides some support for CPO technology-route validation, while the number of news items remains limited."
     if status == "reinforced":
         return f"Live news aligns strongly with the local catalyst framework, matching {len(supported)} catalyst keywords."
     if status == "stable":
