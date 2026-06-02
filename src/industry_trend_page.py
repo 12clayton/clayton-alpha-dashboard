@@ -1121,6 +1121,22 @@ LIVE_NEWS_TEXT = {
 }
 
 
+LIVE_NEWS_TEXT["zh"].update(
+    {
+        "news_source": "新闻来源",
+        "source_type": "来源类型",
+        "no_high_relevance": "当前已刷新可用新闻源，但暂无高相关实时新闻。该结果可能受当前新闻源覆盖限制影响。",
+    }
+)
+LIVE_NEWS_TEXT["en"].update(
+    {
+        "news_source": "News Source",
+        "source_type": "Source Type",
+        "no_high_relevance": "Available news sources have been refreshed, but no high-relevance live news is available. This may reflect coverage limits of the current sources.",
+    }
+)
+
+
 def render_live_news_watch(
     industry: dict,
     lang: str,
@@ -1143,9 +1159,14 @@ def render_live_news_watch(
     elif news_result.get("failed_reason") == "cache_missing":
         st.info(text["cache_missing"])
 
-    cols = st.columns(4)
+    source_names = news_result.get("source_names") or []
+    source_types = news_result.get("source_types") or []
+    source_value = ", ".join(source_names) if source_names else news_result.get("source") or text["na"]
+    source_type_value = ", ".join(source_types) if source_types else text["na"]
+    cols = st.columns(5)
     values = [
-        (text["source"], news_result.get("source") or "Yahoo Finance"),
+        (text["news_source"], source_value),
+        (text["source_type"], source_type_value),
         (text["updated"], news_result.get("live_news_last_updated") or text["na"]),
         (text["count_7d"], str(news_result.get("live_news_count_7d", 0))),
         (text["latest"], news_result.get("latest_news_time") or text["na"]),

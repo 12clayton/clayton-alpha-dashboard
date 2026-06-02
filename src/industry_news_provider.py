@@ -8,6 +8,8 @@ It does not summarize, score, or infer investment conclusions.
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 import hashlib
 import io
 import json
@@ -16,6 +18,9 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote_plus
+from urllib.request import Request, urlopen
+from xml.etree import ElementTree as ET
 
 from src.industry_market_data import INDUSTRY_MARKET_TICKERS
 from src.industry_trend_data import industryTrendData
@@ -31,6 +36,12 @@ NEWS_CACHE_PATH = NEWS_DATA_DIR / "news_cache.json"
 NEWS_CACHE_TTL_HOURS = 6
 MAX_NEWS_PER_INDUSTRY = 20
 MAX_TICKERS_PER_FETCH = 3
+MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY = 3
+MAX_ITEMS_PER_GOOGLE_QUERY = 5
+
+ENABLE_YAHOO_NEWS = True
+ENABLE_GOOGLE_NEWS_RSS = True
+ENABLE_CHINESE_NEWS_RSS = False
 
 NEWS_ITEM_SCHEMA = [
     "id",
@@ -44,6 +55,9 @@ NEWS_ITEM_SCHEMA = [
     "relevance",
     "relevance_reason",
     "source",
+    "source_name",
+    "source_type",
+    "source_quality",
     "language",
 ]
 
@@ -87,6 +101,34 @@ NEWS_KEYWORDS: dict[str, list[str]] = {
     "solar": ["solar", "module price", "inverter", "renewable energy"],
 }
 
+GOOGLE_NEWS_QUERIES: dict[str, list[str]] = {
+    "semiconductor": [
+        "semiconductor AI chip",
+        "HBM Micron Nvidia",
+        "advanced packaging TSMC",
+    ],
+    "cpo_optical_module": [
+        "optical module 800G",
+        "co-packaged optics CPO",
+        "silicon photonics data center",
+    ],
+    "gold": [
+        "gold real yields",
+        "gold central bank buying",
+        "gold dollar treasury yields",
+    ],
+    "real_estate": [
+        "REITs interest rates",
+        "commercial real estate refinancing",
+        "real estate occupancy rates",
+    ],
+    "liquor": [
+        "baijiu channel inventory",
+        "premium liquor consumption",
+        "China liquor wholesale price",
+    ],
+}
+
 LOW_RELEVANCE_TITLE_PATTERNS = [
     "spacex",
     "sofi",
@@ -105,6 +147,91 @@ for logger_name in ("yfinance", "peewee"):
     news_logger = logging.getLogger(logger_name)
     news_logger.setLevel(logging.CRITICAL)
     news_logger.propagate = False
+
+
+@dataclass
+class NewsProviderResult:
+    """Normalized provider output for one industry refresh."""
+
+    provider_name: str
+    source_type: str
+    source_quality: str
+    items: list[dict[str, Any]]
+    fetch_status: str = "available"
+    failed_reason: str = ""
+
+
+class YahooFinanceNewsProvider:
+    """Yahoo Finance ticker-news provider backed by yfinance."""
+
+    provider_name = "Yahoo Finance"
+    source_type = "ticker_news"
+    source_quality = "medium"
+
+    def fetch(self, industry: dict[str, Any], config: dict[str, Any]) -> NewsProviderResult:
+        try:
+            items = fetch_yfinance_news(industry, config)
+            failed_reason = str(config.get("_failed_reason") or "")
+            status = "available" if items else "no_recent_news"
+            if not items and failed_reason:
+                status = "fetch_failed"
+            return NewsProviderResult(
+                provider_name=self.provider_name,
+                source_type=self.source_type,
+                source_quality=self.source_quality,
+                items=items,
+                fetch_status=status,
+                failed_reason=failed_reason,
+            )
+        except Exception as exc:  # pragma: no cover - provider fallback
+            return NewsProviderResult(
+                provider_name=self.provider_name,
+                source_type=self.source_type,
+                source_quality=self.source_quality,
+                items=[],
+                fetch_status="fetch_failed",
+                failed_reason=str(exc),
+            )
+
+
+class GoogleNewsRSSProvider:
+    """Google News RSS search provider using industry keyword queries."""
+
+    provider_name = "Google News RSS"
+    source_type = "search_rss"
+    source_quality = "medium"
+
+    def fetch(self, industry: dict[str, Any], config: dict[str, Any]) -> NewsProviderResult:
+        industry_id = str(industry.get("id", ""))
+        queries = build_google_news_queries(industry_id, config.get("keywords", []))
+        if not queries:
+            return NewsProviderResult(
+                provider_name=self.provider_name,
+                source_type=self.source_type,
+                source_quality=self.source_quality,
+                items=[],
+                fetch_status="not_configured",
+                failed_reason="no_google_news_query",
+            )
+        items: list[dict[str, Any]] = []
+        failures: list[str] = []
+        for query in queries[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]:
+            query_items, failure = fetch_google_news_rss(industry_id, query, config.get("keywords", []))
+            if failure:
+                failures.append(f"{query}: {failure}")
+            items.extend(query_items[:MAX_ITEMS_PER_GOOGLE_QUERY])
+        items = dedupe_news_items(items)
+        status = "available" if items else "no_recent_news"
+        if not items and failures:
+            status = "fetch_failed"
+        return NewsProviderResult(
+            provider_name=self.provider_name,
+            source_type=self.source_type,
+            source_quality=self.source_quality,
+            items=items[:MAX_NEWS_PER_INDUSTRY],
+            fetch_status=status,
+            failed_reason="; ".join(failures[:3]),
+        )
 
 
 def ensure_news_cache() -> Path:
@@ -150,7 +277,9 @@ def read_industry_news(industry_id: str) -> dict[str, Any]:
             "industry_id": industry_id,
             "items": [],
             "last_updated": "",
-            "source": "Yahoo Finance",
+            "source": "",
+            "source_names": [],
+            "source_types": [],
             "fetch_status": status,
             "failed_reason": "cache_missing",
         },
@@ -171,38 +300,73 @@ def refresh_industry_news(industry: dict[str, Any], *, force: bool = True) -> di
             "industry_id": industry_id,
             "items": [],
             "last_updated": utc_now_iso(),
-            "source": "Yahoo Finance",
+            "source": "",
+            "source_names": [],
+            "source_types": [],
             "fetch_status": "not_configured",
             "failed_reason": "no_news_config",
         }
         update_cache(industry_id, result)
         return enrich_news_metrics(result, industry_id)
 
-    try:
-        items = fetch_yfinance_news(industry, config)
-        status = "available" if items else "no_recent_news"
-        failed_reason = str(config.get("_failed_reason") or "")
-        if not items and failed_reason:
-            status = "fetch_failed"
-        result = {
-            "industry_id": industry_id,
-            "items": items[:MAX_NEWS_PER_INDUSTRY],
-            "last_updated": utc_now_iso(),
-            "source": "Yahoo Finance",
-            "fetch_status": status,
-            "failed_reason": failed_reason,
-        }
-    except Exception as exc:  # pragma: no cover - provider fallback
-        result = {
-            "industry_id": industry_id,
-            "items": [],
-            "last_updated": utc_now_iso(),
-            "source": "Yahoo Finance",
-            "fetch_status": "fetch_failed",
-            "failed_reason": str(exc),
-        }
+    provider_results = fetch_news_from_enabled_providers(industry, config)
+    all_items: list[dict[str, Any]] = []
+    failed_reasons: list[str] = []
+    provider_names: list[str] = []
+    provider_types: list[str] = []
+    for provider_result in provider_results:
+        provider_names.append(provider_result.provider_name)
+        provider_types.append(provider_result.source_type)
+        all_items.extend(provider_result.items)
+        if provider_result.failed_reason:
+            failed_reasons.append(f"{provider_result.provider_name}: {provider_result.failed_reason}")
+
+    items = sorted(
+        dedupe_news_items(all_items),
+        key=lambda row: row.get("published_at") or "",
+        reverse=True,
+    )[:MAX_NEWS_PER_INDUSTRY]
+    status = "available" if items else "no_recent_news"
+    if not items and failed_reasons:
+        status = "fetch_failed"
+    result = {
+        "industry_id": industry_id,
+        "items": items,
+        "last_updated": utc_now_iso(),
+        "source": ", ".join(unique_keep_order(provider_names)),
+        "source_names": unique_keep_order(provider_names),
+        "source_types": unique_keep_order(provider_types),
+        "fetch_status": status,
+        "failed_reason": "; ".join(failed_reasons[:4]),
+    }
     update_cache(industry_id, result)
     return enrich_news_metrics(result, industry_id)
+
+
+def fetch_news_from_enabled_providers(industry: dict[str, Any], config: dict[str, Any]) -> list[NewsProviderResult]:
+    """Fetch one industry from all enabled news providers."""
+
+    providers = []
+    if ENABLE_YAHOO_NEWS:
+        providers.append(YahooFinanceNewsProvider())
+    if ENABLE_GOOGLE_NEWS_RSS:
+        providers.append(GoogleNewsRSSProvider())
+    results: list[NewsProviderResult] = []
+    for provider in providers:
+        try:
+            results.append(provider.fetch(industry, config))
+        except Exception as exc:  # pragma: no cover - defensive provider isolation
+            results.append(
+                NewsProviderResult(
+                    provider_name=getattr(provider, "provider_name", "Unknown"),
+                    source_type=getattr(provider, "source_type", "unknown"),
+                    source_quality=getattr(provider, "source_quality", "low"),
+                    items=[],
+                    fetch_status="fetch_failed",
+                    failed_reason=str(exc),
+                )
+            )
+    return results
 
 
 def update_cache(industry_id: str, result: dict[str, Any]) -> None:
@@ -321,9 +485,128 @@ def normalize_yfinance_news_item(
         "related_tickers": [ticker],
         "matched_keywords": matched,
         "source": "Yahoo Finance",
+        "source_name": "Yahoo Finance",
+        "source_type": "ticker_news",
+        "source_quality": "medium",
         "language": "en",
     }
     return ensure_news_relevance(item, industry_id, keywords)
+
+
+def build_google_news_queries(industry_id: str, keywords: list[str]) -> list[str]:
+    """Build a small set of Google News RSS queries for one industry."""
+
+    configured = GOOGLE_NEWS_QUERIES.get(industry_id)
+    if configured:
+        return configured[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
+    cleaned = [
+        keyword
+        for keyword in keywords
+        if keyword
+        and len(str(keyword)) >= 3
+        and not re.search(r"[\u4e00-\u9fff]", str(keyword))
+    ]
+    return unique_keep_order([str(keyword) for keyword in cleaned])[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
+
+
+def fetch_google_news_rss(
+    industry_id: str,
+    query: str,
+    keywords: list[str],
+) -> tuple[list[dict[str, Any]], str]:
+    """Fetch one Google News RSS query and normalize its news items."""
+
+    encoded_query = quote_plus(query)
+    url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+    try:
+        xml_text = quiet_urlopen_text(url)
+    except Exception:
+        return [], "Google News RSS returned no data"
+    if not xml_text:
+        return [], "Google News RSS returned no data"
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return [], "Google News RSS returned invalid RSS"
+    items: list[dict[str, Any]] = []
+    for raw_item in root.findall(".//item")[:MAX_ITEMS_PER_GOOGLE_QUERY]:
+        item = normalize_google_rss_item(raw_item, industry_id, keywords)
+        if item:
+            items.append(item)
+    return items, ""
+
+
+def quiet_urlopen_text(url: str) -> str:
+    """Read RSS text while suppressing provider stdout/stderr."""
+
+    stdout_buffer = io.StringIO()
+    stderr_buffer = io.StringIO()
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 IndustryTrendSearchEngine/1.0"})
+    with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
+        with urlopen(request, timeout=6) as response:  # noqa: S310 - controlled public RSS URL
+            return response.read().decode("utf-8", errors="replace")
+
+
+def normalize_google_rss_item(
+    raw_item: ET.Element,
+    industry_id: str,
+    keywords: list[str],
+) -> dict[str, Any] | None:
+    """Normalize Google News RSS item to the project schema."""
+
+    title = text_from_child(raw_item, "title")
+    if not title:
+        return None
+    link = text_from_child(raw_item, "link")
+    publisher = ""
+    source_node = raw_item.find("source")
+    if source_node is not None and source_node.text:
+        publisher = source_node.text.strip()
+    published_at = normalize_rss_time(text_from_child(raw_item, "pubDate"))
+    matched = match_keywords(title, keywords)
+    item = {
+        "id": stable_news_id(industry_id, title, link),
+        "industry_id": industry_id,
+        "title": title,
+        "publisher": publisher,
+        "link": link,
+        "published_at": published_at,
+        "related_tickers": [],
+        "matched_keywords": matched,
+        "source": "Google News RSS",
+        "source_name": "Google News RSS",
+        "source_type": "search_rss",
+        "source_quality": "medium",
+        "language": infer_news_language(title),
+    }
+    return ensure_news_relevance(item, industry_id, keywords)
+
+
+def text_from_child(node: ET.Element, tag: str) -> str:
+    child = node.find(tag)
+    if child is None or child.text is None:
+        return ""
+    return child.text.strip()
+
+
+def normalize_rss_time(value: str) -> str:
+    if not value:
+        return ""
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return normalize_news_time(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def infer_news_language(title: str) -> str:
+    if re.search(r"[\u4e00-\u9fff]", title):
+        return "zh"
+    if title:
+        return "en"
+    return "unknown"
 
 
 def extract_news_link(content: dict[str, Any], raw_item: dict[str, Any]) -> str:
@@ -359,13 +642,20 @@ def normalize_news_time(value: object) -> str:
 def dedupe_news_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Deduplicate by link first, then normalized title."""
 
-    seen = set()
+    seen_links = set()
+    seen_titles = set()
     output = []
     for item in items:
-        key = item.get("link") or normalize_title(str(item.get("title", "")))
-        if not key or key in seen:
+        link_key = str(item.get("link") or "").strip()
+        title_key = normalize_title(str(item.get("title", "")))
+        if link_key and link_key in seen_links:
             continue
-        seen.add(key)
+        if title_key and title_key in seen_titles:
+            continue
+        if link_key:
+            seen_links.add(link_key)
+        if title_key:
+            seen_titles.add(title_key)
         output.append(item)
     return output
 
@@ -373,7 +663,13 @@ def dedupe_news_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def normalize_title(title: str) -> str:
     """Normalize title for duplicate detection."""
 
-    return re.sub(r"[\s\W_]+", "", title.lower())
+    stripped = re.sub(
+        r"\s+[-|]\s+(yahoo finance|reuters|bloomberg|cnbc|marketwatch|the motley fool|investor's business daily|ap news|associated press)$",
+        "",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"[\s\W_]+", "", stripped.lower())
 
 
 def match_keywords(title: str, keywords: list[str]) -> list[str]:
@@ -393,6 +689,9 @@ def ensure_news_relevance(
 
     output = dict(item)
     config_keywords = keywords if keywords is not None else industry_news_config(industry_id).get("keywords", [])
+    output = ensure_news_source_fields(output)
+    if not isinstance(output.get("related_tickers"), list):
+        output["related_tickers"] = []
     matched = output.get("matched_keywords") if isinstance(output.get("matched_keywords"), list) else []
     if not matched:
         matched = match_keywords(str(output.get("title", "")), config_keywords)
@@ -400,6 +699,22 @@ def ensure_news_relevance(
     relevance, reason = is_news_relevant_to_industry(output, industry_id, config_keywords, output.get("related_tickers") or [])
     output["relevance"] = relevance
     output["relevance_reason"] = reason
+    return output
+
+
+def ensure_news_source_fields(item: dict[str, Any]) -> dict[str, Any]:
+    """Backfill V4.11 source fields for old cache items."""
+
+    output = dict(item)
+    source = str(output.get("source") or "")
+    source_name = str(output.get("source_name") or source or "Yahoo Finance")
+    related_tickers = output.get("related_tickers") if isinstance(output.get("related_tickers"), list) else []
+    output["source"] = source or source_name
+    output["source_name"] = source_name
+    output["source_type"] = str(output.get("source_type") or ("ticker_news" if related_tickers else "unknown"))
+    quality = str(output.get("source_quality") or "medium")
+    output["source_quality"] = quality if quality in {"high", "medium", "low"} else "medium"
+    output["language"] = str(output.get("language") or infer_news_language(str(output.get("title", ""))))
     return output
 
 
@@ -449,6 +764,26 @@ def enrich_news_metrics(result: dict[str, Any], industry_id: str) -> dict[str, A
         for item in items_with_relevance
         if item.get("relevance") == "low"
     ]
+    source_names = unique_keep_order(
+        [
+            str(item.get("source_name") or item.get("source") or "")
+            for item in items_with_relevance
+            if item.get("source_name") or item.get("source")
+        ]
+    )
+    source_types = unique_keep_order(
+        [
+            str(item.get("source_type") or "")
+            for item in items_with_relevance
+            if item.get("source_type")
+        ]
+    )
+    if not source_names and result.get("source_names"):
+        source_names = list(result.get("source_names") or [])
+    if not source_types and result.get("source_types"):
+        source_types = list(result.get("source_types") or [])
+    if not source_names and result.get("source"):
+        source_names = [part.strip() for part in str(result.get("source")).split(",") if part.strip()]
     now = datetime.now(timezone.utc)
     parsed_times = [parse_news_time(item.get("published_at")) for item in items]
     valid_times = [value for value in parsed_times if value is not None]
@@ -465,6 +800,9 @@ def enrich_news_metrics(result: dict[str, Any], industry_id: str) -> dict[str, A
         {
             "industry_id": industry_id,
             "items": items[:MAX_NEWS_PER_INDUSTRY],
+            "source": result.get("source") or ", ".join(source_names),
+            "source_names": source_names,
+            "source_types": source_types,
             "low_relevance_count": len(low_relevance_items),
             "low_relevance_items": low_relevance_items[:MAX_NEWS_PER_INDUSTRY],
             "news_count_24h": count_24h,

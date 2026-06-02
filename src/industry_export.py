@@ -167,6 +167,21 @@ MARKDOWN_LABELS = {
     },
 }
 
+MARKDOWN_LABELS["zh"].update(
+    {
+        "news_source": "新闻来源",
+        "source_type": "来源类型",
+        "low_relevance_count": "低相关新闻数",
+    }
+)
+MARKDOWN_LABELS["en"].update(
+    {
+        "news_source": "News Source",
+        "source_type": "Source Type",
+        "low_relevance_count": "low_relevance_count",
+    }
+)
+
 HEAT_LEVEL_LABELS_ZH = {
     "Low": "低",
     "Medium": "中",
@@ -336,6 +351,9 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     lines.append(f"- {labels['weak_or_missing_evidence']}: {format_export_value(weak_note, na)}")
     lines.append(f"- {labels['reviewed_at']}: {format_export_value(catalyst_review.get('reviewed_at'), na)}")
     lines.extend(["", f"## {text['live_news']}"])
+    lines.append(f"- {labels['news_source']}: {format_export_value(live_news.get('source_names'), na)}")
+    lines.append(f"- {labels['source_type']}: {format_export_value(live_news.get('source_types'), na)}")
+    lines.append(f"- {labels['low_relevance_count']}: {format_export_value(live_news.get('low_relevance_count'), na)}")
     for key in ["live_news_count_7d", "live_news_status", "latest_news_time"]:
         value = localized_live_news_status(live_news.get(key), lang) if key == "live_news_status" else live_news.get(key)
         lines.append(f"- {labels[key]}: {format_export_value(value, na)}")
@@ -397,6 +415,9 @@ def normalize_live_news(live_news: dict[str, Any]) -> dict[str, Any]:
         if item.get("relevance", "high") in {"high", "medium"}
     ]
     return {
+        "source": live_news.get("source"),
+        "source_names": live_news.get("source_names") or [],
+        "source_types": live_news.get("source_types") or [],
         "live_news_count_7d": live_news.get("live_news_count_7d"),
         "live_news_status": live_news.get("live_news_status"),
         "latest_news_time": live_news.get("latest_news_time"),
