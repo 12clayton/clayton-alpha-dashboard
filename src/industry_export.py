@@ -27,6 +27,7 @@ EXPORT_TEXT = {
         "scores": "核心评分",
         "market": "V3 市场价格确认摘要",
         "catalysts": "V4.1 新闻热度与催化事件",
+        "catalyst_review": "V4.10 催化复核",
         "live_news": "V4.2 实时新闻观察",
         "chain": "产业链与风险信号",
         "notes": "数据说明",
@@ -54,6 +55,7 @@ EXPORT_TEXT = {
         "scores": "Framework Scores",
         "market": "V3 Market Price Confirmation Summary",
         "catalysts": "V4.1 News Heat & Catalysts",
+        "catalyst_review": "V4.10 Catalyst Review",
         "live_news": "V4.2 Live News Watch",
         "chain": "Industry Chain & Risk Signals",
         "notes": "Data Notes",
@@ -107,6 +109,13 @@ MARKDOWN_LABELS = {
         "subsectors": "子行业",
         "risk_signals": "风险信号",
         "chain_map": "产业链地图",
+        "review_status": "复核状态",
+        "evidence_level": "证据强度",
+        "one_line_review": "一句话复核",
+        "supported_catalysts": "已支持催化",
+        "emerging_catalysts": "新出现线索",
+        "weak_or_missing_evidence": "证据不足说明",
+        "reviewed_at": "复核时间",
     },
     "en": {
         "industry_id": "Industry ID",
@@ -148,6 +157,13 @@ MARKDOWN_LABELS = {
         "subsectors": "Sub-sectors",
         "risk_signals": "Risk Signals",
         "chain_map": "Chain Map",
+        "review_status": "review_status",
+        "evidence_level": "evidence_level",
+        "one_line_review": "one_line_review",
+        "supported_catalysts": "supported_catalysts",
+        "emerging_catalysts": "emerging_catalysts",
+        "weak_or_missing_evidence": "weak_or_missing_evidence",
+        "reviewed_at": "reviewed_at",
     },
 }
 
@@ -183,6 +199,7 @@ def build_industry_export_context(
     trend_stage: str,
     category: str,
     trend_summary: str,
+    catalyst_review: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a stable export context without fetching additional data."""
 
@@ -235,6 +252,7 @@ def build_industry_export_context(
             "failed_tickers": market_result.get("failed_tickers") or [],
         },
         "catalysts": normalize_catalyst(catalyst),
+        "catalyst_review": normalize_catalyst_review(catalyst_review),
         "live_news": normalize_live_news(live_news),
         "industry_chain": {
             "drivers": industry.get("keyDrivers", []),
@@ -255,6 +273,7 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     scores = context["framework_scores"]
     market = context["market_confirmation"]
     catalysts = context["catalysts"]
+    catalyst_review = context.get("catalyst_review") or {}
     live_news = context["live_news"]
     chain = context["industry_chain"]
     labels = MARKDOWN_LABELS[lang]
@@ -304,6 +323,18 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
         )
         if description:
             lines.append(f"    - {description}")
+    lines.extend(["", f"## {text['catalyst_review']}"])
+    review_status = localized_review_value(catalyst_review, "review_status", lang)
+    evidence_level = localized_review_value(catalyst_review, "evidence_level", lang)
+    one_line_review = localized_review_value(catalyst_review, "one_line_review", lang)
+    weak_note = catalyst_review.get("weak_or_missing_evidence") or []
+    lines.append(f"- {labels['review_status']}: {review_status or na}")
+    lines.append(f"- {labels['evidence_level']}: {evidence_level or na}")
+    lines.append(f"- {labels['one_line_review']}: {one_line_review or na}")
+    lines.append(f"- {labels['supported_catalysts']}: {format_export_value(catalyst_review.get('supported_catalysts'), na)}")
+    lines.append(f"- {labels['emerging_catalysts']}: {format_export_value(catalyst_review.get('emerging_catalysts'), na)}")
+    lines.append(f"- {labels['weak_or_missing_evidence']}: {format_export_value(weak_note, na)}")
+    lines.append(f"- {labels['reviewed_at']}: {format_export_value(catalyst_review.get('reviewed_at'), na)}")
     lines.extend(["", f"## {text['live_news']}"])
     for key in ["live_news_count_7d", "live_news_status", "latest_news_time"]:
         value = localized_live_news_status(live_news.get(key), lang) if key == "live_news_status" else live_news.get(key)
@@ -340,6 +371,25 @@ def normalize_catalyst(catalyst: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def normalize_catalyst_review(review: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not review:
+        return None
+    return {
+        "review_status": review.get("review_status"),
+        "review_status_zh": review.get("review_status_zh"),
+        "evidence_level": review.get("evidence_level"),
+        "evidence_level_zh": review.get("evidence_level_zh"),
+        "supported_catalysts": review.get("supported_catalysts") or [],
+        "emerging_catalysts": review.get("emerging_catalysts") or [],
+        "weak_or_missing_evidence": review.get("weak_or_missing_evidence") or [],
+        "coverage_note": review.get("coverage_note"),
+        "coverage_note_zh": review.get("coverage_note_zh"),
+        "one_line_review": review.get("one_line_review"),
+        "one_line_review_zh": review.get("one_line_review_zh"),
+        "reviewed_at": review.get("reviewed_at"),
+    }
+
+
 def normalize_live_news(live_news: dict[str, Any]) -> dict[str, Any]:
     items = [
         item
@@ -367,6 +417,12 @@ def localized_value(data: dict[str, Any], key: str, lang: str) -> Any:
     if lang == "zh":
         return data.get(f"{key}Zh") or data.get(key)
     return data.get(key) or data.get(f"{key}Zh")
+
+
+def localized_review_value(data: dict[str, Any], key: str, lang: str) -> Any:
+    if lang == "zh":
+        return data.get(f"{key}_zh") or data.get(key)
+    return data.get(key) or data.get(f"{key}_zh")
 
 
 def localized_heat_level(value: Any, lang: str) -> str:

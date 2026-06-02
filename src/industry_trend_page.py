@@ -17,6 +17,7 @@ from src.industry_catalyst_data import (
     get_catalyst_data,
     localized_label,
 )
+from src.industry_catalyst_review import build_catalyst_review
 from src.industry_export import build_industry_export_context, build_industry_json, build_industry_markdown
 from src.industry_market_data import get_market_confirmation_data
 from src.industry_news_provider import read_industry_news, refresh_industry_news
@@ -583,11 +584,18 @@ def render_export_context(
     md_label = "复制用 Markdown" if lang == "zh" else "Copy-ready Markdown"
     md_download = "下载 Markdown" if lang == "zh" else "Download Markdown"
     json_download = "下载 JSON" if lang == "zh" else "Download JSON"
+    catalyst_review = build_catalyst_review(
+        str(industry.get("id", "")),
+        catalyst,
+        live_news,
+        language=lang,
+    )
     context = build_industry_export_context(
         industry=industry,
         market_result=market_result,
         catalyst=catalyst,
         live_news=live_news,
+        catalyst_review=catalyst_review,
         lang=lang,
         trend_stage=trend_stage_text(industry, lang),
         category=category_label(industry, lang),
@@ -841,12 +849,12 @@ def render_developer_details(industry: dict, result: dict, live_news: dict, lang
 CATALYST_TEXT = {
     "zh": {
         "title": "新闻热度与催化事件（V4.1 Framework）",
-        "note": "V4.1 使用本地催化事件框架数据，尚未接入实时新闻源。",
+        "note": "V4.1 使用本地催化事件框架，事件日期为框架记录日期，不代表实时新闻发布时间。",
         "missing": "当前行业尚未配置 V4.1 催化事件框架数据。",
         "heat_score": "热度分数",
         "heat_level": "热度等级",
         "heat_direction": "热度方向",
-        "date": "日期",
+        "date": "框架日期",
         "event": "事件",
         "type": "类型",
         "impact": "影响",
@@ -855,12 +863,12 @@ CATALYST_TEXT = {
     },
     "en": {
         "title": "News Heat & Catalysts (V4.1 Framework)",
-        "note": "V4.1 uses local catalyst framework data and is not connected to live news yet.",
+        "note": "V4.1 uses local catalyst framework data. Event dates are framework record dates, not live news publication dates.",
         "missing": "This industry does not yet have V4.1 catalyst framework data configured.",
         "heat_score": "Heat Score",
         "heat_level": "Heat Level",
         "heat_direction": "Heat Direction",
-        "date": "Date",
+        "date": "Framework Date",
         "event": "Event",
         "type": "Type",
         "impact": "Impact",
@@ -954,6 +962,77 @@ def render_news_and_catalyst_details(
 
     render_news_heat_catalysts(industry, lang, catalyst=catalyst, mode="detailed")
     render_live_news_watch(industry, lang, cached_result=live_news, mode="detailed")
+    render_catalyst_review(industry, catalyst, live_news, lang)
+
+
+CATALYST_REVIEW_TEXT = {
+    "zh": {
+        "title": "催化复核（V4.10）",
+        "note": "V4.10 使用实时新闻观察结果复核本地催化框架，但不会自动改写框架数据。",
+        "status": "复核状态",
+        "evidence": "证据强度",
+        "one_line": "一句话复核",
+        "supported": "已被实时新闻支持的催化线索",
+        "emerging": "新出现的催化线索",
+        "weak": "证据不足或覆盖不足说明",
+        "coverage": "覆盖说明",
+        "reviewed_at": "复核时间",
+        "none": "暂无",
+    },
+    "en": {
+        "title": "Catalyst Review (V4.10)",
+        "note": "V4.10 reviews the local catalyst framework using live news observations, but does not automatically rewrite framework data.",
+        "status": "Review Status",
+        "evidence": "Evidence Level",
+        "one_line": "One-line Review",
+        "supported": "Catalyst Clues Supported by Live News",
+        "emerging": "Emerging Catalyst Clues",
+        "weak": "Weak or Missing Evidence",
+        "coverage": "Coverage Note",
+        "reviewed_at": "Reviewed At",
+        "none": "N/A",
+    },
+}
+
+
+def render_catalyst_review(
+    industry: dict,
+    catalyst: dict | None,
+    live_news: dict,
+    lang: str,
+) -> None:
+    """Render V4.10 deterministic catalyst review."""
+
+    text = CATALYST_REVIEW_TEXT[lang]
+    review = build_catalyst_review(
+        str(industry.get("id", "")),
+        catalyst,
+        live_news,
+        language=lang,
+    )
+    st.markdown(f"### {text['title']}")
+    st.caption(text["note"])
+    c1, c2, c3 = st.columns([1, 1, 1.4])
+    with c1:
+        status = review["review_status_zh"] if lang == "zh" else review["review_status"]
+        st.metric(text["status"], status)
+    with c2:
+        evidence = review["evidence_level_zh"] if lang == "zh" else review["evidence_level"]
+        st.metric(text["evidence"], evidence)
+    with c3:
+        st.metric(text["reviewed_at"], review.get("reviewed_at") or text["none"])
+    one_line = review["one_line_review_zh"] if lang == "zh" else review["one_line_review"]
+    coverage = review["coverage_note_zh"] if lang == "zh" else review["coverage_note"]
+    st.markdown(f"**{text['one_line']}**：{one_line}")
+    st.caption(f"{text['coverage']}：{coverage}")
+    rows = [
+        (text["supported"], review.get("supported_catalysts") or []),
+        (text["emerging"], review.get("emerging_catalysts") or []),
+        (text["weak"], review.get("weak_or_missing_evidence") or []),
+    ]
+    for label, values in rows:
+        value_text = ", ".join(str(value) for value in values) if values else text["none"]
+        st.markdown(f"**{label}**：{value_text}")
 
 
 def render_catalyst_event_guide(lang: str, title_override: str | None = None, wrap: bool = True) -> None:
@@ -989,16 +1068,16 @@ def catalyst_guide_frame(items: dict[str, str], columns: dict[str, str]) -> pd.D
 LIVE_NEWS_TEXT = {
     "zh": {
         "title": "实时新闻观察（V4.2 Lite）",
-        "note": "V4.2 仅展示公开新闻抓取结果，用于辅助观察行业热度，不代表完整研究结论。",
+        "note": "V4.2 仅展示当前新闻源抓取到的高相关新闻，用于辅助观察，不代表完整新闻覆盖。",
         "unavailable": "实时新闻暂不可用，当前仍展示 V4.1 本地催化事件框架。",
         "refresh": "刷新新闻数据",
         "source": "数据源",
-        "updated": "更新时间",
-        "count_7d": "最近 7 天新闻数量",
-        "latest": "最新新闻时间",
+        "updated": "新闻缓存更新时间",
+        "count_7d": "最近7天高相关新闻数量",
+        "latest": "最近高相关新闻时间",
         "status": "实时新闻状态",
         "cache_missing": "暂无缓存新闻。请点击刷新新闻数据。",
-        "no_high_relevance": "暂无高相关实时新闻。",
+        "no_high_relevance": "新闻缓存已更新，但当前来源暂无高相关实时新闻。该结果可能受 Yahoo Finance / yfinance 对细分主题覆盖限制影响。",
         "time": "时间",
         "title_col": "标题",
         "publisher": "来源",
@@ -1015,16 +1094,16 @@ LIVE_NEWS_TEXT = {
     },
     "en": {
         "title": "Live News Watch (V4.2 Lite)",
-        "note": "V4.2 displays public news fetch results for heat monitoring only. It does not represent a full research conclusion.",
+        "note": "V4.2 shows high-relevance news captured by the current source and does not represent complete news coverage.",
         "unavailable": "Live news is currently unavailable. The page is still showing the V4.1 local catalyst framework.",
         "refresh": "Refresh News Data",
         "source": "Data Source",
-        "updated": "Updated",
-        "count_7d": "7D News Count",
-        "latest": "Latest News Time",
+        "updated": "News Cache Updated",
+        "count_7d": "7D High-relevance News Count",
+        "latest": "Latest High-relevance News Time",
         "status": "Live News Status",
         "cache_missing": "No cached news yet. Use Refresh News Data.",
-        "no_high_relevance": "No high-relevance live news available.",
+        "no_high_relevance": "News cache is updated, but no high-relevance live news is available from the current source. This may reflect limited Yahoo Finance / yfinance coverage for niche themes.",
         "time": "Time",
         "title_col": "Title",
         "publisher": "Source",
