@@ -988,8 +988,16 @@ def render_news_and_catalyst_details(
 
     render_news_heat_catalysts(industry, lang, catalyst=catalyst, mode="detailed")
     live_news = render_live_news_watch(industry, lang, cached_result=live_news, mode="detailed")
-    review = render_catalyst_review(industry, catalyst, live_news, lang)
+    review = build_catalyst_review(
+        str(industry.get("id", "")),
+        catalyst,
+        live_news,
+        language=lang,
+    )
     render_dynamic_catalyst_snapshot(industry, catalyst, live_news, review, lang)
+    expander_title = "查看催化复核细节（V4.10）" if lang == "zh" else "View Catalyst Review Details (V4.10)"
+    with st.expander(expander_title, expanded=False):
+        render_catalyst_review(industry, catalyst, live_news, lang, review=review)
 
 
 CATALYST_REVIEW_TEXT = {
@@ -1027,11 +1035,12 @@ def render_catalyst_review(
     catalyst: dict | None,
     live_news: dict,
     lang: str,
+    review: dict | None = None,
 ) -> dict:
     """Render V4.10 deterministic catalyst review."""
 
     text = CATALYST_REVIEW_TEXT[lang]
-    review = build_catalyst_review(
+    review = review or build_catalyst_review(
         str(industry.get("id", "")),
         catalyst,
         live_news,
