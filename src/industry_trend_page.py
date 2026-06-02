@@ -18,6 +18,11 @@ from src.industry_catalyst_data import (
     localized_label,
 )
 from src.industry_catalyst_review import build_catalyst_review
+from src.industry_catalyst_snapshot import (
+    build_dynamic_catalyst_snapshot,
+    read_dynamic_catalyst_snapshot,
+    save_dynamic_catalyst_snapshot,
+)
 from src.industry_export import build_industry_export_context, build_industry_json, build_industry_markdown
 from src.industry_market_data import get_market_confirmation_data
 from src.industry_news_provider import read_industry_news, refresh_industry_news
@@ -596,6 +601,14 @@ def render_export_context(
         catalyst=catalyst,
         live_news=live_news,
         catalyst_review=catalyst_review,
+        dynamic_catalyst_snapshot=get_current_dynamic_snapshot(
+            str(industry.get("id", "")),
+            catalyst,
+            live_news,
+            catalyst_review,
+            lang,
+            prefer_cache=False,
+        ),
         lang=lang,
         trend_stage=trend_stage_text(industry, lang),
         category=category_label(industry, lang),
@@ -877,6 +890,19 @@ CATALYST_TEXT = {
     },
 }
 
+CATALYST_TEXT["zh"].update(
+    {
+        "title": "本地催化框架（V4.1）",
+        "note": "V4.1 是本地行业研究框架，事件日期为框架记录日期，不会自动每日改写；V4.12 会基于实时新闻与复核结果生成动态快照。",
+    }
+)
+CATALYST_TEXT["en"].update(
+    {
+        "title": "Local Catalyst Framework (V4.1)",
+        "note": "V4.1 is a local industry research framework. Event dates are framework record dates and are not automatically overwritten daily. V4.12 generates a dynamic snapshot based on live news and catalyst review results.",
+    }
+)
+
 
 def render_news_heat_catalysts(
     industry: dict,
@@ -961,8 +987,9 @@ def render_news_and_catalyst_details(
     """Render event table, news refresh, and cached live news list."""
 
     render_news_heat_catalysts(industry, lang, catalyst=catalyst, mode="detailed")
-    render_live_news_watch(industry, lang, cached_result=live_news, mode="detailed")
-    render_catalyst_review(industry, catalyst, live_news, lang)
+    live_news = render_live_news_watch(industry, lang, cached_result=live_news, mode="detailed")
+    review = render_catalyst_review(industry, catalyst, live_news, lang)
+    render_dynamic_catalyst_snapshot(industry, catalyst, live_news, review, lang)
 
 
 CATALYST_REVIEW_TEXT = {
@@ -1000,7 +1027,7 @@ def render_catalyst_review(
     catalyst: dict | None,
     live_news: dict,
     lang: str,
-) -> None:
+) -> dict:
     """Render V4.10 deterministic catalyst review."""
 
     text = CATALYST_REVIEW_TEXT[lang]
@@ -1033,6 +1060,111 @@ def render_catalyst_review(
     for label, values in rows:
         value_text = ", ".join(str(value) for value in values) if values else text["none"]
         st.markdown(f"**{label}**：{value_text}")
+
+    return review
+
+
+CATALYST_SNAPSHOT_TEXT = {
+    "zh": {
+        "title": "动态催化快照（V4.12）",
+        "note": "V4.12 基于实时新闻与催化复核结果生成动态快照，但不会自动改写 V4.1 本地框架数据。",
+        "generated_at": "快照更新时间",
+        "framework_dates": "本地框架记录日期",
+        "status": "动态状态",
+        "evidence": "证据强度",
+        "one_line": "一句话快照",
+        "active": "当前活跃催化",
+        "emerging": "新出现催化线索",
+        "cooling": "降温催化线索",
+        "coverage": "覆盖说明",
+        "none": "暂无",
+    },
+    "en": {
+        "title": "Dynamic Catalyst Snapshot (V4.12)",
+        "note": "V4.12 generates a dynamic snapshot from live news and catalyst review results, but does not automatically rewrite V4.1 local framework data.",
+        "generated_at": "Snapshot Updated",
+        "framework_dates": "Framework Record Dates",
+        "status": "Dynamic Status",
+        "evidence": "Evidence Level",
+        "one_line": "One-line Snapshot",
+        "active": "Active Catalysts",
+        "emerging": "Emerging Catalyst Clues",
+        "cooling": "Cooling Catalyst Clues",
+        "coverage": "Coverage Note",
+        "none": "N/A",
+    },
+}
+
+
+def get_current_dynamic_snapshot(
+    industry_id: str,
+    catalyst: dict | None,
+    live_news: dict,
+    catalyst_review: dict,
+    lang: str,
+    *,
+    prefer_cache: bool = True,
+) -> dict:
+    """Read cached V4.12 snapshot first, or build one locally without network access."""
+
+    if prefer_cache:
+        cached = read_dynamic_catalyst_snapshot(industry_id)
+        if cached:
+            return cached
+    return build_dynamic_catalyst_snapshot(
+        industry_id,
+        catalyst,
+        live_news,
+        catalyst_review,
+        language=lang,
+    )
+
+
+def render_dynamic_catalyst_snapshot(
+    industry: dict,
+    catalyst: dict | None,
+    live_news: dict,
+    catalyst_review: dict,
+    lang: str,
+) -> None:
+    """Render and cache the V4.12 dynamic catalyst snapshot."""
+
+    text = CATALYST_SNAPSHOT_TEXT[lang]
+    industry_id = str(industry.get("id", ""))
+    snapshot = build_dynamic_catalyst_snapshot(
+        industry_id,
+        catalyst,
+        live_news,
+        catalyst_review,
+        language=lang,
+    )
+    save_dynamic_catalyst_snapshot(snapshot)
+    st.markdown(f"### {text['title']}")
+    st.caption(text["note"])
+    c1, c2, c3, c4 = st.columns([1.4, 1.4, 1, 1])
+    with c1:
+        st.metric(text["generated_at"], snapshot.get("snapshot_generated_at") or text["none"])
+    with c2:
+        dates = ", ".join(snapshot.get("framework_record_dates") or []) or text["none"]
+        st.metric(text["framework_dates"], dates)
+    with c3:
+        status = snapshot.get("review_status_zh") if lang == "zh" else snapshot.get("review_status")
+        st.metric(text["status"], status or text["none"])
+    with c4:
+        evidence = snapshot.get("evidence_level_zh") if lang == "zh" else snapshot.get("evidence_level")
+        st.metric(text["evidence"], evidence or text["none"])
+    one_line = snapshot.get("one_line_snapshot_zh") if lang == "zh" else snapshot.get("one_line_snapshot")
+    coverage = snapshot.get("coverage_note_zh") if lang == "zh" else snapshot.get("coverage_note")
+    st.markdown(f"**{text['one_line']}**: {one_line or text['none']}")
+    st.caption(f"{text['coverage']}: {coverage or text['none']}")
+    rows = [
+        (text["active"], snapshot.get("active_catalysts_zh") if lang == "zh" else snapshot.get("active_catalysts")),
+        (text["emerging"], snapshot.get("emerging_catalysts_zh") if lang == "zh" else snapshot.get("emerging_catalysts")),
+        (text["cooling"], snapshot.get("cooling_catalysts_zh") if lang == "zh" else snapshot.get("cooling_catalysts")),
+    ]
+    for label, values in rows:
+        value_text = ", ".join(str(value) for value in (values or [])) if values else text["none"]
+        st.markdown(f"**{label}**: {value_text}")
 
 
 def render_catalyst_event_guide(lang: str, title_override: str | None = None, wrap: bool = True) -> None:
@@ -1142,7 +1274,7 @@ def render_live_news_watch(
     lang: str,
     cached_result: dict | None = None,
     mode: str = "simple",
-) -> None:
+) -> dict:
     """Render V4.2 cached live-news watch module."""
 
     text = LIVE_NEWS_TEXT[lang]
@@ -1177,7 +1309,7 @@ def render_live_news_watch(
     st.caption(f"{text['status']}: {text['statuses'].get(status, status)}")
 
     if mode == "simple":
-        return
+        return news_result
 
     rows = []
     for item in (news_result.get("items") or [])[:5]:
@@ -1195,6 +1327,7 @@ def render_live_news_watch(
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
     else:
         st.info(text["no_high_relevance"])
+    return news_result
 
 
 def render_market_meta_strip(result: dict, lang: str) -> None:

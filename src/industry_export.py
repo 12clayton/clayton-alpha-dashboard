@@ -167,11 +167,21 @@ MARKDOWN_LABELS = {
     },
 }
 
+EXPORT_TEXT["zh"].update({"dynamic_snapshot": "V4.12 动态催化快照"})
+EXPORT_TEXT["en"].update({"dynamic_snapshot": "V4.12 Dynamic Catalyst Snapshot"})
+
 MARKDOWN_LABELS["zh"].update(
     {
         "news_source": "新闻来源",
         "source_type": "来源类型",
         "low_relevance_count": "低相关新闻数",
+        "snapshot_generated_at": "快照更新时间",
+        "framework_record_dates": "本地框架记录日期",
+        "dynamic_status": "动态状态",
+        "active_catalysts": "当前活跃催化",
+        "cooling_catalysts": "降温催化线索",
+        "one_line_snapshot": "一句话快照",
+        "coverage_note": "覆盖说明",
     }
 )
 MARKDOWN_LABELS["en"].update(
@@ -179,6 +189,13 @@ MARKDOWN_LABELS["en"].update(
         "news_source": "News Source",
         "source_type": "Source Type",
         "low_relevance_count": "low_relevance_count",
+        "snapshot_generated_at": "snapshot_generated_at",
+        "framework_record_dates": "framework_record_dates",
+        "dynamic_status": "dynamic_status",
+        "active_catalysts": "active_catalysts",
+        "cooling_catalysts": "cooling_catalysts",
+        "one_line_snapshot": "one_line_snapshot",
+        "coverage_note": "coverage_note",
     }
 )
 
@@ -215,6 +232,7 @@ def build_industry_export_context(
     category: str,
     trend_summary: str,
     catalyst_review: dict[str, Any] | None = None,
+    dynamic_catalyst_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a stable export context without fetching additional data."""
 
@@ -268,6 +286,7 @@ def build_industry_export_context(
         },
         "catalysts": normalize_catalyst(catalyst),
         "catalyst_review": normalize_catalyst_review(catalyst_review),
+        "dynamic_catalyst_snapshot": normalize_dynamic_catalyst_snapshot(dynamic_catalyst_snapshot),
         "live_news": normalize_live_news(live_news),
         "industry_chain": {
             "drivers": industry.get("keyDrivers", []),
@@ -289,6 +308,7 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     market = context["market_confirmation"]
     catalysts = context["catalysts"]
     catalyst_review = context.get("catalyst_review") or {}
+    dynamic_snapshot = context.get("dynamic_catalyst_snapshot") or {}
     live_news = context["live_news"]
     chain = context["industry_chain"]
     labels = MARKDOWN_LABELS[lang]
@@ -350,6 +370,23 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     lines.append(f"- {labels['emerging_catalysts']}: {format_export_value(catalyst_review.get('emerging_catalysts'), na)}")
     lines.append(f"- {labels['weak_or_missing_evidence']}: {format_export_value(weak_note, na)}")
     lines.append(f"- {labels['reviewed_at']}: {format_export_value(catalyst_review.get('reviewed_at'), na)}")
+    lines.extend(["", f"## {text['dynamic_snapshot']}"])
+    snapshot_status = localized_snapshot_value(dynamic_snapshot, "review_status", lang)
+    snapshot_evidence = localized_snapshot_value(dynamic_snapshot, "evidence_level", lang)
+    snapshot_one_line = localized_snapshot_value(dynamic_snapshot, "one_line_snapshot", lang)
+    snapshot_coverage = localized_snapshot_value(dynamic_snapshot, "coverage_note", lang)
+    active_key = "active_catalysts_zh" if lang == "zh" else "active_catalysts"
+    emerging_key = "emerging_catalysts_zh" if lang == "zh" else "emerging_catalysts"
+    cooling_key = "cooling_catalysts_zh" if lang == "zh" else "cooling_catalysts"
+    lines.append(f"- {labels['snapshot_generated_at']}: {format_export_value(dynamic_snapshot.get('snapshot_generated_at'), na)}")
+    lines.append(f"- {labels['framework_record_dates']}: {format_export_value(dynamic_snapshot.get('framework_record_dates'), na)}")
+    lines.append(f"- {labels['dynamic_status']}: {snapshot_status or na}")
+    lines.append(f"- {labels['evidence_level']}: {snapshot_evidence or na}")
+    lines.append(f"- {labels['one_line_snapshot']}: {snapshot_one_line or na}")
+    lines.append(f"- {labels['active_catalysts']}: {format_export_value(dynamic_snapshot.get(active_key), na)}")
+    lines.append(f"- {labels['emerging_catalysts']}: {format_export_value(dynamic_snapshot.get(emerging_key), na)}")
+    lines.append(f"- {labels['cooling_catalysts']}: {format_export_value(dynamic_snapshot.get(cooling_key), na)}")
+    lines.append(f"- {labels['coverage_note']}: {snapshot_coverage or na}")
     lines.extend(["", f"## {text['live_news']}"])
     lines.append(f"- {labels['news_source']}: {format_export_value(live_news.get('source_names'), na)}")
     lines.append(f"- {labels['source_type']}: {format_export_value(live_news.get('source_types'), na)}")
@@ -408,6 +445,30 @@ def normalize_catalyst_review(review: dict[str, Any] | None) -> dict[str, Any] |
     }
 
 
+def normalize_dynamic_catalyst_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not snapshot:
+        return None
+    return {
+        "industry_id": snapshot.get("industry_id"),
+        "framework_record_dates": snapshot.get("framework_record_dates") or [],
+        "snapshot_generated_at": snapshot.get("snapshot_generated_at"),
+        "review_status": snapshot.get("review_status"),
+        "review_status_zh": snapshot.get("review_status_zh"),
+        "evidence_level": snapshot.get("evidence_level"),
+        "evidence_level_zh": snapshot.get("evidence_level_zh"),
+        "active_catalysts": snapshot.get("active_catalysts") or [],
+        "active_catalysts_zh": snapshot.get("active_catalysts_zh") or [],
+        "emerging_catalysts": snapshot.get("emerging_catalysts") or [],
+        "emerging_catalysts_zh": snapshot.get("emerging_catalysts_zh") or [],
+        "cooling_catalysts": snapshot.get("cooling_catalysts") or [],
+        "cooling_catalysts_zh": snapshot.get("cooling_catalysts_zh") or [],
+        "coverage_note": snapshot.get("coverage_note"),
+        "coverage_note_zh": snapshot.get("coverage_note_zh"),
+        "one_line_snapshot": snapshot.get("one_line_snapshot"),
+        "one_line_snapshot_zh": snapshot.get("one_line_snapshot_zh"),
+    }
+
+
 def normalize_live_news(live_news: dict[str, Any]) -> dict[str, Any]:
     items = [
         item
@@ -443,6 +504,20 @@ def localized_value(data: dict[str, Any], key: str, lang: str) -> Any:
 def localized_review_value(data: dict[str, Any], key: str, lang: str) -> Any:
     if lang == "zh":
         return data.get(f"{key}_zh") or data.get(key)
+    return data.get(key) or data.get(f"{key}_zh")
+
+
+def localized_snapshot_value(data: dict[str, Any], key: str, lang: str) -> Any:
+    if lang == "zh":
+        if key == "review_status":
+            return data.get("review_status_zh") or data.get("review_status")
+        if key == "evidence_level":
+            return data.get("evidence_level_zh") or data.get("evidence_level")
+        return data.get(f"{key}_zh") or data.get(key)
+    if key == "review_status":
+        return data.get("review_status") or data.get("review_status_zh")
+    if key == "evidence_level":
+        return data.get("evidence_level") or data.get("evidence_level_zh")
     return data.get(key) or data.get(f"{key}_zh")
 
 
