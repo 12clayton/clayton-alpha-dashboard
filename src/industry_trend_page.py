@@ -1039,15 +1039,16 @@ def render_catalyst_review(
     )
     st.markdown(f"### {text['title']}")
     st.caption(text["note"])
-    c1, c2, c3 = st.columns([1, 1, 1.4])
-    with c1:
-        status = review["review_status_zh"] if lang == "zh" else review["review_status"]
-        st.metric(text["status"], status)
-    with c2:
-        evidence = review["evidence_level_zh"] if lang == "zh" else review["evidence_level"]
-        st.metric(text["evidence"], evidence)
-    with c3:
-        st.metric(text["reviewed_at"], review.get("reviewed_at") or text["none"])
+    status = review["review_status_zh"] if lang == "zh" else review["review_status"]
+    evidence = review["evidence_level_zh"] if lang == "zh" else review["evidence_level"]
+    render_compact_info_items(
+        [
+            (text["status"], status),
+            (text["evidence"], evidence),
+            (text["reviewed_at"], format_datetime_compact(review.get("reviewed_at"), lang)),
+        ],
+        columns=3,
+    )
     one_line = review["one_line_review_zh"] if lang == "zh" else review["one_line_review"]
     coverage = review["coverage_note_zh"] if lang == "zh" else review["coverage_note"]
     st.markdown(f"**{text['one_line']}**：{one_line}")
@@ -1141,18 +1142,18 @@ def render_dynamic_catalyst_snapshot(
     save_dynamic_catalyst_snapshot(snapshot)
     st.markdown(f"### {text['title']}")
     st.caption(text["note"])
-    c1, c2, c3, c4 = st.columns([1.4, 1.4, 1, 1])
-    with c1:
-        st.metric(text["generated_at"], snapshot.get("snapshot_generated_at") or text["none"])
-    with c2:
-        dates = ", ".join(snapshot.get("framework_record_dates") or []) or text["none"]
-        st.metric(text["framework_dates"], dates)
-    with c3:
-        status = snapshot.get("review_status_zh") if lang == "zh" else snapshot.get("review_status")
-        st.metric(text["status"], status or text["none"])
-    with c4:
-        evidence = snapshot.get("evidence_level_zh") if lang == "zh" else snapshot.get("evidence_level")
-        st.metric(text["evidence"], evidence or text["none"])
+    dates = ", ".join(snapshot.get("framework_record_dates") or []) or text["none"]
+    status = snapshot.get("review_status_zh") if lang == "zh" else snapshot.get("review_status")
+    evidence = snapshot.get("evidence_level_zh") if lang == "zh" else snapshot.get("evidence_level")
+    render_compact_info_items(
+        [
+            (text["generated_at"], format_datetime_compact(snapshot.get("snapshot_generated_at"), lang)),
+            (text["framework_dates"], dates),
+            (text["status"], status or text["none"]),
+            (text["evidence"], evidence or text["none"]),
+        ],
+        columns=2,
+    )
     one_line = snapshot.get("one_line_snapshot_zh") if lang == "zh" else snapshot.get("one_line_snapshot")
     coverage = snapshot.get("coverage_note_zh") if lang == "zh" else snapshot.get("coverage_note")
     st.markdown(f"**{text['one_line']}**: {one_line or text['none']}")
@@ -1295,17 +1296,16 @@ def render_live_news_watch(
     source_types = news_result.get("source_types") or []
     source_value = ", ".join(source_names) if source_names else news_result.get("source") or text["na"]
     source_type_value = ", ".join(source_types) if source_types else text["na"]
-    cols = st.columns(5)
-    values = [
-        (text["news_source"], source_value),
-        (text["source_type"], source_type_value),
-        (text["updated"], news_result.get("live_news_last_updated") or text["na"]),
-        (text["count_7d"], str(news_result.get("live_news_count_7d", 0))),
-        (text["latest"], news_result.get("latest_news_time") or text["na"]),
-    ]
-    for col, (label, value) in zip(cols, values):
-        with col:
-            st.metric(label, value)
+    render_compact_info_items(
+        [
+            (text["news_source"], source_value),
+            (text["source_type"], source_type_value),
+            (text["updated"], format_datetime_compact(news_result.get("live_news_last_updated"), lang)),
+            (text["count_7d"], str(news_result.get("live_news_count_7d", 0))),
+            (text["latest"], format_datetime_compact(news_result.get("latest_news_time"), lang)),
+        ],
+        columns=2,
+    )
     st.caption(f"{text['status']}: {text['statuses'].get(status, status)}")
 
     if mode == "simple":
@@ -1835,6 +1835,35 @@ def format_score(value: object) -> str:
         return f"{float(value):.1f}"
     except (TypeError, ValueError):
         return "N/A"
+
+
+def format_datetime_compact(value: object, lang: str = "zh") -> str:
+    """Format ISO-like timestamps for compact UI display."""
+
+    if not value:
+        return "N/A" if lang == "en" else "暂无"
+    try:
+        parsed = pd.to_datetime(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if pd.isna(parsed):
+        return "N/A" if lang == "en" else "暂无"
+    try:
+        return parsed.strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return str(value)
+
+
+def render_compact_info_items(items: list[tuple[str, object]], columns: int = 2) -> None:
+    """Render small informational fields without large Streamlit metrics."""
+
+    if not items:
+        return
+    column_count = max(1, min(columns, len(items)))
+    cols = st.columns(column_count)
+    for index, (label, value) in enumerate(items):
+        with cols[index % column_count]:
+            st.caption(f"**{label}**: {value}")
 
 
 def format_ratio_with_count(result: dict, key: str) -> str:
