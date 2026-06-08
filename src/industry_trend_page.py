@@ -17,6 +17,10 @@ from src.industry_catalyst_data import (
     get_catalyst_data,
     localized_label,
 )
+from src.industry_catalyst_framework_store import (
+    apply_snapshot_as_framework_override,
+    get_effective_catalyst_framework,
+)
 from src.industry_catalyst_review import build_catalyst_review
 from src.industry_catalyst_snapshot import (
     build_dynamic_catalyst_snapshot,
@@ -498,7 +502,7 @@ def render_industry_trend_search_page(lang: str | None = None, show_language_pic
     render_recognition_result(industry, matched, lang)
 
     market_result = get_market_confirmation_data(industry.get("id", ""))
-    catalyst = get_catalyst_data(str(industry.get("id", "")))
+    catalyst = get_effective_catalyst_framework(str(industry.get("id", "")))
     live_news = read_industry_news(str(industry.get("id", "")))
     render_industry_overview(industry, lang)
     render_overall_view_card(industry, market_result, catalyst, lang)
@@ -903,6 +907,25 @@ CATALYST_TEXT["en"].update(
     }
 )
 
+CATALYST_TEXT["zh"].update(
+    {
+        "framework_status": "框架状态",
+        "framework_updated": "框架已更新",
+        "framework_base": "使用基础本地框架",
+        "latest_framework_updated_at": "最新框架更新时间",
+        "base_framework_dates": "基础框架记录日期",
+    }
+)
+CATALYST_TEXT["en"].update(
+    {
+        "framework_status": "Framework Status",
+        "framework_updated": "Framework Updated",
+        "framework_base": "Using Base Local Framework",
+        "latest_framework_updated_at": "Latest Framework Updated At",
+        "base_framework_dates": "Base Framework Record Dates",
+    }
+)
+
 
 def render_news_heat_catalysts(
     industry: dict,
@@ -915,7 +938,7 @@ def render_news_heat_catalysts(
     text = CATALYST_TEXT[lang]
     st.markdown(f"### {text['title']}")
     st.caption(text["note"])
-    catalyst = catalyst or get_catalyst_data(str(industry.get("id", "")))
+    catalyst = catalyst or get_effective_catalyst_framework(str(industry.get("id", "")))
     if not catalyst:
         st.info(text["missing"])
         return
@@ -932,6 +955,7 @@ def render_news_heat_catalysts(
         )
     summary_key = "summaryZh" if lang == "zh" else "summary"
     st.markdown(str(catalyst.get(summary_key) or catalyst.get("summary") or ""))
+    render_catalyst_framework_meta(catalyst, lang)
 
     rows = []
     for event in catalyst.get("events", []):
@@ -955,6 +979,18 @@ def render_news_heat_catalysts(
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
+def render_catalyst_framework_meta(catalyst: dict, lang: str) -> None:
+    """Render effective V4.1 framework metadata."""
+
+    text = CATALYST_TEXT[lang]
+    base_dates = ", ".join(str(item) for item in (catalyst.get("base_framework_dates") or [])) or text["missing"]
+    status_text = text["framework_updated"] if catalyst.get("is_override") else text["framework_base"]
+    items = [(text["framework_status"], status_text), (text["base_framework_dates"], base_dates)]
+    if catalyst.get("is_override"):
+        items.insert(1, (text["latest_framework_updated_at"], format_datetime_compact(catalyst.get("updated_at"), lang)))
+    render_compact_info_items(items, columns=2)
+
+
 def render_news_heat_summary(catalyst: dict | None, live_news: dict, lang: str) -> None:
     """Render compact V4 heat and live-news summary."""
 
@@ -976,6 +1012,7 @@ def render_news_heat_summary(catalyst: dict | None, live_news: dict, lang: str) 
         st.metric(live_text["status"], live_text["statuses"].get(status, status))
     summary_key = "summaryZh" if lang == "zh" else "summary"
     st.markdown(str(catalyst.get(summary_key) or catalyst.get("summary") or ""))
+    render_catalyst_framework_meta(catalyst, lang)
 
 
 def render_news_and_catalyst_details(
@@ -1105,6 +1142,19 @@ CATALYST_SNAPSHOT_TEXT = {
     },
 }
 
+CATALYST_SNAPSHOT_TEXT["zh"].update(
+    {
+        "apply_framework": "应用为最新催化框架",
+        "apply_success": "已应用为最新催化框架。页面刷新后 V4.1 将显示更新后的框架。",
+    }
+)
+CATALYST_SNAPSHOT_TEXT["en"].update(
+    {
+        "apply_framework": "Apply as Latest Catalyst Framework",
+        "apply_success": "Applied as latest catalyst framework. V4.1 will show the updated framework after refresh.",
+    }
+)
+
 
 def get_current_dynamic_snapshot(
     industry_id: str,
@@ -1175,6 +1225,10 @@ def render_dynamic_catalyst_snapshot(
     for label, values in rows:
         value_text = ", ".join(str(value) for value in (values or [])) if values else text["none"]
         st.markdown(f"**{label}**: {value_text}")
+    if st.button(text["apply_framework"], key=f"apply_catalyst_framework_{industry_id}", width="content"):
+        apply_snapshot_as_framework_override(industry_id, None, snapshot, catalyst_review, live_news)
+        st.success(text["apply_success"])
+        st.rerun()
 
 
 def render_catalyst_event_guide(lang: str, title_override: str | None = None, wrap: bool = True) -> None:

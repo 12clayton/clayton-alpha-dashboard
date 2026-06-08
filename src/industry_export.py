@@ -199,6 +199,23 @@ MARKDOWN_LABELS["en"].update(
     }
 )
 
+MARKDOWN_LABELS["zh"].update(
+    {
+        "framework_is_override": "是否为更新后的框架",
+        "framework_updated_at": "最新框架更新时间",
+        "base_framework_dates": "基础框架记录日期",
+        "effective_framework_events": "当前 effective framework events",
+    }
+)
+MARKDOWN_LABELS["en"].update(
+    {
+        "framework_is_override": "framework_is_override",
+        "framework_updated_at": "framework_updated_at",
+        "base_framework_dates": "base_framework_dates",
+        "effective_framework_events": "effective_framework_events",
+    }
+)
+
 HEAT_LEVEL_LABELS_ZH = {
     "Low": "低",
     "Medium": "中",
@@ -285,6 +302,7 @@ def build_industry_export_context(
             "failed_tickers": market_result.get("failed_tickers") or [],
         },
         "catalysts": normalize_catalyst(catalyst),
+        "catalyst_framework": normalize_catalyst_framework(catalyst),
         "catalyst_review": normalize_catalyst_review(catalyst_review),
         "dynamic_catalyst_snapshot": normalize_dynamic_catalyst_snapshot(dynamic_catalyst_snapshot),
         "live_news": normalize_live_news(live_news),
@@ -307,6 +325,7 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     scores = context["framework_scores"]
     market = context["market_confirmation"]
     catalysts = context["catalysts"]
+    framework = context.get("catalyst_framework") or {}
     catalyst_review = context.get("catalyst_review") or {}
     dynamic_snapshot = context.get("dynamic_catalyst_snapshot") or {}
     live_news = context["live_news"]
@@ -341,6 +360,9 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     for key, value in market.items():
         lines.append(f"- {labels.get(key, key)}: {format_export_value(value, na)}")
     lines.extend(["", f"## {text['catalysts']}"])
+    lines.append(f"- {labels['framework_is_override']}: {format_export_value(framework.get('is_override'), na)}")
+    lines.append(f"- {labels['framework_updated_at']}: {format_export_value(framework.get('updated_at'), na)}")
+    lines.append(f"- {labels['base_framework_dates']}: {format_export_value(framework.get('base_framework_dates'), na)}")
     lines.append(f"- {labels['heat_score']}: {format_export_value(catalysts.get('heat_score'), na)}")
     lines.append(f"- {labels['heat_level']}: {localized_heat_level(catalysts.get('heat_level'), lang) or na}")
     lines.append(f"- {labels['heat_direction']}: {localized_heat_direction(catalysts.get('heat_direction'), lang) or na}")
@@ -358,6 +380,7 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
         )
         if description:
             lines.append(f"    - {description}")
+    lines.append(f"- {labels['effective_framework_events']}: {format_export_value(framework.get('events'), na)}")
     lines.extend(["", f"## {text['catalyst_review']}"])
     review_status = localized_review_value(catalyst_review, "review_status", lang)
     evidence_level = localized_review_value(catalyst_review, "evidence_level", lang)
@@ -422,6 +445,18 @@ def normalize_catalyst(catalyst: dict[str, Any] | None) -> dict[str, Any]:
         "heat_direction": catalyst.get("heat_direction"),
         "summary": catalyst.get("summary"),
         "summaryZh": catalyst.get("summaryZh"),
+        "events": catalyst.get("events", []),
+    }
+
+
+def normalize_catalyst_framework(catalyst: dict[str, Any] | None) -> dict[str, Any]:
+    if not catalyst:
+        return {"is_override": False, "events": [], "base_framework_dates": []}
+    return {
+        "is_override": bool(catalyst.get("is_override")),
+        "updated_at": catalyst.get("updated_at"),
+        "source": catalyst.get("source"),
+        "base_framework_dates": catalyst.get("base_framework_dates") or [],
         "events": catalyst.get("events", []),
     }
 
