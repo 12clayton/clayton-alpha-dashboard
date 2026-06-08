@@ -61,6 +61,8 @@ RADAR_TEXT = {
         "load": "刷新 / 加载市场雷达数据",
         "refresh_market": "刷新市场数据",
         "market_refresh_done": "市场数据已刷新，缓存已更新。",
+        "market_refresh_failed": "刷新失败，当前仍使用旧市场缓存。",
+        "market_refresh_partial": "市场数据已刷新，但部分行业数据不可用，已保留失败状态。",
         "no_radar_cache": "暂无本地雷达缓存，请点击“刷新市场数据”生成。",
         "no_news_cache": "暂无新闻缓存，请展开“数据更新与维护”。",
         "load_watchlist_first": "优先加载收藏行业",
@@ -162,6 +164,8 @@ RADAR_TEXT = {
         "load": "Refresh / Load Radar Data",
         "refresh_market": "Refresh Market Data",
         "market_refresh_done": "Market data refreshed and cache updated.",
+        "market_refresh_failed": "Refresh failed. The page is still using the old market cache.",
+        "market_refresh_partial": "Market data refreshed, with unavailable industries preserved as failed status.",
         "no_radar_cache": "No local radar cache found. Click “Refresh Market Data” to generate it.",
         "no_news_cache": "No news cache found. Expand Data Update & Maintenance.",
         "load_watchlist_first": "Load Watchlist First",
@@ -303,11 +307,12 @@ def render_industry_radar_page(lang: str) -> None:
         st.caption(text["watchlist_note"])
     with st.expander(text["data_update_maintenance"], expanded=False):
         if st.button(text["refresh_market"], width="content", key="radar_refresh_market_data"):
-            get_market_confirmation_data.clear()
-            refreshed_records = build_live_radar_records(lang, previous_snapshot)
-            save_latest_radar([record["raw"] for record in refreshed_records])
-            st.success(text["market_refresh_done"])
-            st.rerun()
+            success, message = refresh_market_radar_cache(lang, previous_snapshot)
+            if success:
+                st.success(message)
+                st.rerun()
+            else:
+                st.warning(message)
         render_radar_news_refresh(filtered_records, watchlist, lang)
     with st.expander(text["guides_expander"], expanded=False):
         radar_catalyst_title = "新闻热度与催化事件说明" if lang == "zh" else "News Heat & Catalyst Guide"
@@ -371,6 +376,53 @@ def news_cache_updated_at() -> str:
         return datetime.fromtimestamp(NEWS_CACHE_PATH.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return ""
+
+
+def refresh_market_radar_cache(
+    lang: str,
+    previous_snapshot: dict[str, dict[str, Any]] | None = None,
+) -> tuple[bool, str]:
+    """Rebuild full radar market rows and persist the latest local cache."""
+
+    text = RADAR_TEXT[lang]
+    try:
+        get_market_confirmation_data.clear()
+        refreshed_records = build_live_radar_records(lang, previous_snapshot)
+        if not refreshed_records:
+            return False, text["market_refresh_failed"]
+
+        raw_rows = [record["raw"] for record in refreshed_records]
+        mapped_rows = [
+            row
+            for row in raw_rows
+            if str(row.get("industry_id", "")) in INDUSTRY_MARKET_TICKERS
+        ]
+        available_rows = [
+            row
+            for row in mapped_rows
+            if str(row.get("v3_status", "")) == "available"
+        ]
+        if mapped_rows and not available_rows:
+            return False, text["market_refresh_failed"]
+
+        save_latest_radar(raw_rows)
+        save_snapshot(raw_rows)
+        clear_radar_page_caches()
+        if len(available_rows) < len(mapped_rows):
+            return True, text["market_refresh_partial"]
+        return True, text["market_refresh_done"]
+    except Exception as exc:
+        return False, f"{text['market_refresh_failed']} {exc}"
+
+
+def clear_radar_page_caches() -> None:
+    """Clear local Streamlit caches that can keep stale radar data visible."""
+
+    for cached_func in (load_snapshot_history,):
+        try:
+            cached_func.clear()
+        except Exception:
+            continue
 
 
 def build_live_radar_records(

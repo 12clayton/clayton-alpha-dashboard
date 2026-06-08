@@ -75,7 +75,10 @@ def save_latest_radar(snapshot_rows: list[dict[str, Any]]) -> Path:
     """Save the latest radar cache used for fast default page loads."""
 
     ensure_radar_data_dir()
-    pd.DataFrame(snapshot_rows).to_csv(LATEST_RADAR_PATH, index=False, encoding="utf-8-sig")
+    frame = pd.DataFrame(snapshot_rows)
+    temp_path = LATEST_RADAR_PATH.with_suffix(".tmp.csv")
+    frame.to_csv(temp_path, index=False, encoding="utf-8-sig")
+    temp_path.replace(LATEST_RADAR_PATH)
     return LATEST_RADAR_PATH
 
 
