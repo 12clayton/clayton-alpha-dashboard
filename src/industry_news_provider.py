@@ -23,6 +23,7 @@ from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
 from src.industry_market_data import INDUSTRY_MARKET_TICKERS
+from src.industry_news_config import get_industry_news_config
 from src.industry_trend_data import industryTrendData
 
 try:
@@ -203,7 +204,7 @@ class GoogleNewsRSSProvider:
 
     def fetch(self, industry: dict[str, Any], config: dict[str, Any]) -> NewsProviderResult:
         industry_id = str(industry.get("id", ""))
-        queries = build_google_news_queries(industry_id, config.get("keywords", []))
+        queries = config.get("search_queries") or build_google_news_queries(industry_id, config.get("keywords", []))
         if not queries:
             return NewsProviderResult(
                 provider_name=self.provider_name,
@@ -395,6 +396,7 @@ def industry_news_config(industry_id: str) -> dict[str, Any]:
     industry = next((item for item in industryTrendData if item.get("id") == industry_id), None)
     if not industry:
         return {}
+    configured = get_industry_news_config(industry_id)
     mapping = INDUSTRY_MARKET_TICKERS.get(industry_id, {})
     unstable_tickers = set(mapping.get("unstable_tickers", []))
     tickers = [
@@ -402,15 +404,24 @@ def industry_news_config(industry_id: str) -> dict[str, Any]:
         for ticker in [*mapping.get("etfs", []), *mapping.get("leaders", [])]
         if ticker and ticker not in unstable_tickers
     ][:MAX_TICKERS_PER_FETCH]
-    keywords = [
+    fallback_keywords = [
         str(industry.get("name", "")),
         str(industry.get("chineseName", "")),
         *[str(alias) for alias in industry.get("aliases", [])],
         *NEWS_KEYWORDS.get(industry_id, []),
     ]
+    relevance_keywords = [str(keyword) for keyword in configured.get("relevance_keywords", [])]
+    keywords = [*relevance_keywords, *fallback_keywords]
     return {
         "tickers": [ticker for ticker in tickers if ticker],
         "keywords": unique_keep_order([keyword for keyword in keywords if keyword]),
+        "search_queries": unique_keep_order([str(query) for query in configured.get("search_queries", []) if query]),
+        "relevance_keywords": unique_keep_order([keyword for keyword in relevance_keywords if keyword]),
+        "exclude_keywords": unique_keep_order([str(keyword) for keyword in configured.get("exclude_keywords", []) if keyword]),
+        "coverage_notes": str(configured.get("coverage_notes", "")),
+        "coverage_notes_zh": str(configured.get("coverage_notes_zh", "")),
+        "preferred_sources": list(configured.get("preferred_sources", [])),
+        "has_news_config": bool(configured),
     }
 
 
@@ -496,6 +507,9 @@ def normalize_yfinance_news_item(
 def build_google_news_queries(industry_id: str, keywords: list[str]) -> list[str]:
     """Build a small set of Google News RSS queries for one industry."""
 
+    configured_queries = get_industry_news_config(industry_id).get("search_queries", [])
+    if configured_queries:
+        return unique_keep_order([str(query) for query in configured_queries if query])[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
     configured = GOOGLE_NEWS_QUERIES.get(industry_id)
     if configured:
         return configured[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
@@ -727,6 +741,9 @@ def is_news_relevant_to_industry(
     """Classify whether a ticker-feed news item is industry-relevant enough for default display."""
 
     title = str(news_item.get("title", ""))
+    exclude_keywords = industry_news_config(industry_id).get("exclude_keywords", [])
+    if match_keywords(title, exclude_keywords):
+        return "low", "configured_exclude_keyword_match"
     matched = news_item.get("matched_keywords") or match_keywords(title, industry_keywords)
     if matched:
         return "high", "title_keyword_match"

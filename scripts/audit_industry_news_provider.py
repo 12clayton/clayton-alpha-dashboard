@@ -18,28 +18,29 @@ from src.industry_news_provider import (  # noqa: E402
     GoogleNewsRSSProvider,
     MAX_TICKERS_PER_FETCH,
     NEWS_CACHE_TTL_HOURS,
+    NEWS_CACHE_PATH,
     NEWS_ITEM_SCHEMA,
     RELEVANCE_LEVELS,
     YahooFinanceNewsProvider,
+    build_google_news_queries,
     cached_news_is_fresh,
     dedupe_news_items,
     ensure_news_relevance,
-    ensure_news_cache,
     industry_news_config,
     load_news_cache,
     normalize_google_rss_item,
     normalize_yfinance_news_item,
     read_industry_news,
-    save_news_cache,
 )
+from src.industry_news_config import get_industry_news_config  # noqa: E402
 from src.industry_trend_data import industryTrendData  # noqa: E402
 
 
 def main() -> int:
     issues = []
-    cache_path = ensure_news_cache()
+    cache_path = NEWS_CACHE_PATH
     if not cache_path.exists():
-        issues.append("cache file was not created")
+        issues.append("cache file does not exist for read-only audit")
     if not isinstance(NEWS_CACHE_TTL_HOURS, int) or NEWS_CACHE_TTL_HOURS <= 0:
         issues.append("cache TTL constant is invalid")
     if MAX_TICKERS_PER_FETCH != 3:
@@ -48,10 +49,6 @@ def main() -> int:
     cache_payload = load_news_cache()
     if not isinstance(cache_payload, dict) or "industries" not in cache_payload:
         issues.append("cache read function returned invalid payload")
-    try:
-        save_news_cache(cache_payload)
-    except Exception as exc:
-        issues.append(f"cache write function failed: {exc}")
 
     sample = read_industry_news("semiconductor")
     if not isinstance(cached_news_is_fresh("semiconductor"), bool):
@@ -78,6 +75,16 @@ def main() -> int:
         issues.append("GoogleNewsRSSProvider source_type should be search_rss")
 
     semiconductor_config = industry_news_config("semiconductor")
+    configured_semiconductor = get_industry_news_config("semiconductor")
+    if not configured_semiconductor:
+        issues.append("industry_news_config.py did not return semiconductor config")
+    if not semiconductor_config.get("search_queries"):
+        issues.append("configured semiconductor should return search_queries")
+    if len(semiconductor_config.get("relevance_keywords", [])) < 8:
+        issues.append("configured semiconductor should return relevance_keywords")
+    if "Nvidia AI chip HBM" not in build_google_news_queries("semiconductor", semiconductor_config.get("keywords", [])):
+        issues.append("configured semiconductor search query should take priority")
+
     high_item = normalize_yfinance_news_item(
         {"title": "Nvidia GPU demand lifts AI chip suppliers", "publisher": "Audit"},
         "semiconductor",
@@ -103,6 +110,10 @@ def main() -> int:
             issues.append(f"normalized item missing source field: {field}")
 
     cpo_config = industry_news_config("cpo_optical_module")
+    if "co-packaged optics" not in cpo_config.get("search_queries", []):
+        issues.append("configured CPO search_queries should be exposed")
+    if "co-packaged optics" not in cpo_config.get("relevance_keywords", []):
+        issues.append("configured CPO relevance_keywords should be exposed")
     cpo_high = ensure_news_relevance(
         {
             "industry_id": "cpo_optical_module",
@@ -152,6 +163,11 @@ def main() -> int:
         issues.append("CPO non-keyword sample should be low relevance")
     if gold_high.get("relevance") != "high":
         issues.append("Gold real-yields sample should be high relevance")
+    fallback_config = industry_news_config("memory")
+    if fallback_config.get("has_news_config"):
+        issues.append("unconfigured memory industry should use fallback, not explicit config")
+    if not fallback_config.get("keywords"):
+        issues.append("unconfigured memory industry fallback should return keywords")
     duplicate_items = dedupe_news_items(
         [
             {"title": "Nvidia GPU demand lifts suppliers", "link": "https://example.com/a"},

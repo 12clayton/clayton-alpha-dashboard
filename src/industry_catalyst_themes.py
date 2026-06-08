@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.industry_news_config import get_industry_news_config
+
 
 BROAD_FALLBACK_TERMS = {
     "chip",
@@ -112,6 +114,20 @@ def normalize_catalyst_themes(
     if not raw_terms:
         return []
     output = []
+    for mapping in configured_theme_mappings(industry_id):
+        matched = matched_theme_terms(raw_terms, mapping.get("terms", []))
+        if matched:
+            output.append(
+                {
+                    "theme": mapping["theme"],
+                    "theme_zh": mapping["theme_zh"],
+                    "matched_terms": matched,
+                    "reason": mapping["reason"],
+                    "reason_zh": mapping["reason_zh"],
+                }
+            )
+    if output:
+        return output
     for mapping in THEME_MAPPINGS.get(industry_id, []):
         matched = matched_theme_terms(raw_terms, mapping.get("terms", []))
         if matched:
@@ -141,6 +157,31 @@ def normalize_catalyst_themes(
         }
         for term in fallback
     ]
+
+
+def configured_theme_mappings(industry_id: str) -> list[dict[str, Any]]:
+    """Build theme mappings from the optional V4.14 news config layer."""
+
+    theme_keywords = get_industry_news_config(industry_id).get("theme_keywords", {})
+    if not isinstance(theme_keywords, dict):
+        return []
+    mappings = []
+    for theme_name, terms in theme_keywords.items():
+        if not isinstance(terms, list):
+            continue
+        clean_terms = unique_keep_order([str(term).strip() for term in terms if str(term).strip()])
+        if not clean_terms:
+            continue
+        mappings.append(
+            {
+                "theme": str(theme_name),
+                "theme_zh": str(theme_name),
+                "terms": clean_terms,
+                "reason": "Configured news terms match this catalyst theme.",
+                "reason_zh": "配置层新闻关键词命中该催化主题。",
+            }
+        )
+    return mappings
 
 
 def theme_display_name(theme: dict[str, Any], language: str = "zh") -> str:
