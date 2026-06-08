@@ -690,8 +690,19 @@ def match_keywords(title: str, keywords: list[str]) -> list[str]:
     """Simple keyword match against title text."""
 
     lower_title = title.lower()
-    matched = [keyword for keyword in keywords if keyword and str(keyword).lower() in lower_title]
+    matched = [keyword for keyword in keywords if keyword and keyword_matches_title(str(keyword), lower_title)]
     return unique_keep_order([str(keyword) for keyword in matched])
+
+
+def keyword_matches_title(keyword: str, lower_title: str) -> bool:
+    """Match phrases by substring and short ASCII terms by token boundary."""
+
+    lower_keyword = keyword.lower()
+    if not lower_keyword:
+        return False
+    if re.fullmatch(r"[a-z0-9]{2,4}", lower_keyword):
+        return re.search(rf"(?<![a-z0-9]){re.escape(lower_keyword)}(?![a-z0-9])", lower_title) is not None
+    return lower_keyword in lower_title
 
 
 def ensure_news_relevance(

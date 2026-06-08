@@ -163,11 +163,11 @@ def main() -> int:
         issues.append("CPO non-keyword sample should be low relevance")
     if gold_high.get("relevance") != "high":
         issues.append("Gold real-yields sample should be high relevance")
-    fallback_config = industry_news_config("memory")
+    fallback_config = industry_news_config("wind_power")
     if fallback_config.get("has_news_config"):
-        issues.append("unconfigured memory industry should use fallback, not explicit config")
+        issues.append("unconfigured wind_power industry should use fallback, not explicit config")
     if not fallback_config.get("keywords"):
-        issues.append("unconfigured memory industry fallback should return keywords")
+        issues.append("unconfigured wind_power industry fallback should return keywords")
     duplicate_items = dedupe_news_items(
         [
             {"title": "Nvidia GPU demand lifts suppliers", "link": "https://example.com/a"},
