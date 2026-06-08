@@ -293,20 +293,20 @@ def build_override_events(
         events[0]["titleZh"] = f"{emerging[0]}成为新增催化线索"
         events[0]["title"] = f"{emerging[0]} becomes an emerging catalyst clue"
         events[0]["titleZh"] = f"{emerging_zh[0]}\u6210\u4e3a\u65b0\u589e\u50ac\u5316\u7ebf\u7d22"
+        emerging_zh_text = "、".join(emerging_zh[:8])
         events[0]["descriptionZh"] = (
-            f"V4.12 \u52a8\u6001\u5feb\u7167\u8bc6\u522b\u5230\u65b0\u589e\u7ebf\u7d22\uff1a"
-            f"{'\u3001'.join(emerging_zh[:8])}\u3002"
+            f"V4.12 动态快照识别到新增线索：{emerging_zh_text}。"
         )
     if active:
         active_index = 1 if emerging and len(events) > 1 else 0
         if active_index < len(events):
             events[active_index]["titleZh"] = f"{active[0]}获得实时新闻验证"
             events[active_index]["title"] = f"{active[0]} validated by live news"
-            events[active_index]["titleZh"] = f"{active_zh[0]}\u83b7\u5f97\u5b9e\u65f6\u65b0\u95fb\u9a8c\u8bc1"
+            events[active_index]["titleZh"] = f"{active_zh[0]}获得实时新闻验证"
+            active_zh_text = "、".join(active_zh[:8])
             events[active_index]["descriptionZh"] = (
-                f"\u5f53\u524d\u6d3b\u8dc3\u50ac\u5316\u5305\u62ec\uff1a{'\u3001'.join(active_zh[:8])}\u3002"
+                f"V4.12 动态快照显示这些催化线索获得实时新闻支持：{active_zh_text}。"
             )
-    return events[:3]
 
 
 def theme_names(themes: list[dict[str, Any]], language: str) -> list[str]:
