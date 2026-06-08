@@ -39,6 +39,24 @@ MAX_NEWS_PER_INDUSTRY = 20
 MAX_TICKERS_PER_FETCH = 3
 MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY = 3
 MAX_ITEMS_PER_GOOGLE_QUERY = 5
+LOW_RELEVANCE_CACHE_LIMIT = 5
+LOW_RELEVANCE_PER_SOURCE_LIMIT = 5
+
+CPO_QUERY_CONTEXT_TERMS = [
+    "optical",
+    "optics",
+    "photonics",
+    "transceiver",
+    "interconnect",
+    "cpo",
+    "co-packaged",
+    "lpo",
+    "800g",
+    "1.6t",
+    "光模块",
+    "硅光",
+    "光互连",
+]
 
 ENABLE_YAHOO_NEWS = True
 ENABLE_GOOGLE_NEWS_RSS = True
@@ -64,6 +82,7 @@ NEWS_ITEM_SCHEMA = [
 
 LIVE_NEWS_STATUS = {"available", "no_recent_news", "fetch_failed", "not_configured"}
 RELEVANCE_LEVELS = {"high", "medium", "low"}
+RELEVANCE_SORT_RANK = {"high": 0, "medium": 1, "low": 2}
 
 NEWS_KEYWORDS: dict[str, list[str]] = {
     "semiconductor": [
@@ -322,11 +341,7 @@ def refresh_industry_news(industry: dict[str, Any], *, force: bool = True) -> di
         if provider_result.failed_reason:
             failed_reasons.append(f"{provider_result.provider_name}: {provider_result.failed_reason}")
 
-    items = sorted(
-        dedupe_news_items(all_items),
-        key=lambda row: row.get("published_at") or "",
-        reverse=True,
-    )[:MAX_NEWS_PER_INDUSTRY]
+    items = rank_and_limit_news_items(all_items, industry_id, config.get("keywords", []))
     status = "available" if items else "no_recent_news"
     if not items and failed_reasons:
         status = "fetch_failed"
@@ -342,6 +357,54 @@ def refresh_industry_news(industry: dict[str, Any], *, force: bool = True) -> di
     }
     update_cache(industry_id, result)
     return enrich_news_metrics(result, industry_id)
+
+
+def rank_and_limit_news_items(
+    items: list[dict[str, Any]],
+    industry_id: str,
+    keywords: list[str],
+) -> list[dict[str, Any]]:
+    """Re-rank merged provider items by relevance before final cache truncation."""
+
+    relevant_items = [
+        ensure_news_relevance(item, industry_id, keywords)
+        for item in items
+        if isinstance(item, dict)
+    ]
+    deduped_items = dedupe_news_items(relevant_items)
+    ranked_items = sorted(deduped_items, key=news_cache_sort_key)
+    high_medium_items = [
+        item
+        for item in ranked_items
+        if item.get("relevance") in {"high", "medium"}
+    ]
+    if len(high_medium_items) >= MAX_NEWS_PER_INDUSTRY:
+        return high_medium_items[:MAX_NEWS_PER_INDUSTRY]
+
+    output = list(high_medium_items)
+    low_by_source: dict[str, int] = {}
+    low_kept = 0
+    for item in ranked_items:
+        if item.get("relevance") != "low":
+            continue
+        if low_kept >= LOW_RELEVANCE_CACHE_LIMIT or len(output) >= MAX_NEWS_PER_INDUSTRY:
+            break
+        source_name = str(item.get("source_name") or item.get("source") or "unknown")
+        if low_by_source.get(source_name, 0) >= LOW_RELEVANCE_PER_SOURCE_LIMIT:
+            continue
+        output.append(item)
+        low_kept += 1
+        low_by_source[source_name] = low_by_source.get(source_name, 0) + 1
+    return output
+
+
+def news_cache_sort_key(item: dict[str, Any]) -> tuple[int, float]:
+    """Sort high/medium first, newest first within each relevance level."""
+
+    relevance = str(item.get("relevance") or "low")
+    parsed = parse_news_time(item.get("published_at"))
+    timestamp = parsed.timestamp() if parsed is not None else 0.0
+    return (RELEVANCE_SORT_RANK.get(relevance, RELEVANCE_SORT_RANK["low"]), -timestamp)
 
 
 def fetch_news_from_enabled_providers(industry: dict[str, Any], config: dict[str, Any]) -> list[NewsProviderResult]:
@@ -509,10 +572,10 @@ def build_google_news_queries(industry_id: str, keywords: list[str]) -> list[str
 
     configured_queries = get_industry_news_config(industry_id).get("search_queries", [])
     if configured_queries:
-        return unique_keep_order([str(query) for query in configured_queries if query])[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
+        return limit_google_news_queries(industry_id, [str(query) for query in configured_queries if query])
     configured = GOOGLE_NEWS_QUERIES.get(industry_id)
     if configured:
-        return configured[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
+        return limit_google_news_queries(industry_id, configured)
     cleaned = [
         keyword
         for keyword in keywords
@@ -520,7 +583,27 @@ def build_google_news_queries(industry_id: str, keywords: list[str]) -> list[str
         and len(str(keyword)) >= 3
         and not re.search(r"[\u4e00-\u9fff]", str(keyword))
     ]
-    return unique_keep_order([str(keyword) for keyword in cleaned])[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
+    return limit_google_news_queries(industry_id, [str(keyword) for keyword in cleaned])
+
+
+def limit_google_news_queries(industry_id: str, queries: list[str]) -> list[str]:
+    """Apply provider query limits and CPO-specific context filtering."""
+
+    filtered = [
+        query
+        for query in unique_keep_order([str(query) for query in queries if query])
+        if not cpo_query_without_optical_context(industry_id, query)
+    ]
+    return filtered[:MAX_GOOGLE_NEWS_QUERIES_PER_INDUSTRY]
+
+
+def cpo_query_without_optical_context(industry_id: str, query: str) -> bool:
+    """Return true when a CPO query lacks optical-network context."""
+
+    if industry_id != "cpo_optical_module":
+        return False
+    lower_query = query.lower()
+    return not any(term in lower_query for term in CPO_QUERY_CONTEXT_TERMS)
 
 
 def fetch_google_news_rss(

@@ -23,13 +23,16 @@ from src.industry_news_provider import (  # noqa: E402
     RELEVANCE_LEVELS,
     YahooFinanceNewsProvider,
     build_google_news_queries,
+    cpo_query_without_optical_context,
     cached_news_is_fresh,
     dedupe_news_items,
     ensure_news_relevance,
+    enrich_news_metrics,
     industry_news_config,
     load_news_cache,
     normalize_google_rss_item,
     normalize_yfinance_news_item,
+    rank_and_limit_news_items,
     read_industry_news,
 )
 from src.industry_news_config import get_industry_news_config  # noqa: E402
@@ -114,6 +117,14 @@ def main() -> int:
         issues.append("configured CPO search_queries should be exposed")
     if "co-packaged optics" not in cpo_config.get("relevance_keywords", []):
         issues.append("configured CPO relevance_keywords should be exposed")
+    cpo_queries = build_google_news_queries("cpo_optical_module", cpo_config.get("keywords", []))
+    if not cpo_queries:
+        issues.append("configured CPO should return strict Google News queries")
+    if any(cpo_query_without_optical_context("cpo_optical_module", query) for query in cpo_queries):
+        issues.append(f"CPO queries should all include optical context: {cpo_queries}")
+    for broad_query in ["Nvidia AI", "Marvell AI", "Broadcom AI", "semiconductor AI"]:
+        if not cpo_query_without_optical_context("cpo_optical_module", broad_query):
+            issues.append(f"CPO strict query mode should reject broad query: {broad_query}")
     cpo_high = ensure_news_relevance(
         {
             "industry_id": "cpo_optical_module",
@@ -132,6 +143,62 @@ def main() -> int:
         {
             "industry_id": "cpo_optical_module",
             "title": "Generic market update mentions unrelated companies",
+            "related_tickers": [],
+            "matched_keywords": [],
+            "source": "Google News RSS",
+            "source_name": "Google News RSS",
+            "source_type": "search_rss",
+            "source_quality": "medium",
+        },
+        "cpo_optical_module",
+        cpo_config.get("keywords", []),
+    )
+    cpo_stock_low = ensure_news_relevance(
+        {
+            "industry_id": "cpo_optical_module",
+            "title": "Marvell stock surges on S&P 500 inclusion",
+            "related_tickers": [],
+            "matched_keywords": [],
+            "source": "Google News RSS",
+            "source_name": "Google News RSS",
+            "source_type": "search_rss",
+            "source_quality": "medium",
+        },
+        "cpo_optical_module",
+        cpo_config.get("keywords", []),
+    )
+    cpo_margin_low = ensure_news_relevance(
+        {
+            "industry_id": "cpo_optical_module",
+            "title": "Nvidia's 75% Margins Could Hold Through 2030",
+            "related_tickers": [],
+            "matched_keywords": [],
+            "source": "Google News RSS",
+            "source_name": "Google News RSS",
+            "source_type": "search_rss",
+            "source_quality": "medium",
+        },
+        "cpo_optical_module",
+        cpo_config.get("keywords", []),
+    )
+    cpo_silicon_photonics_high = ensure_news_relevance(
+        {
+            "industry_id": "cpo_optical_module",
+            "title": "Optics and Silicon Photonics: The Next Data Highway Inside Chips",
+            "related_tickers": [],
+            "matched_keywords": [],
+            "source": "Google News RSS",
+            "source_name": "Google News RSS",
+            "source_type": "search_rss",
+            "source_quality": "medium",
+        },
+        "cpo_optical_module",
+        cpo_config.get("keywords", []),
+    )
+    cpo_transceiver_high = ensure_news_relevance(
+        {
+            "industry_id": "cpo_optical_module",
+            "title": "800G optical transceiver demand rises for AI data centers",
             "related_tickers": [],
             "matched_keywords": [],
             "source": "Google News RSS",
@@ -161,6 +228,87 @@ def main() -> int:
         issues.append("CPO keyword sample should be high relevance")
     if cpo_low.get("relevance") != "low":
         issues.append("CPO non-keyword sample should be low relevance")
+    if cpo_stock_low.get("relevance") != "low":
+        issues.append("CPO Marvell stock sample should be low relevance")
+    if cpo_margin_low.get("relevance") != "low":
+        issues.append("CPO Nvidia margin sample should be low relevance")
+    if cpo_silicon_photonics_high.get("relevance") not in {"high", "medium"}:
+        issues.append("CPO silicon photonics sample should be high or medium relevance")
+    if cpo_transceiver_high.get("relevance") not in {"high", "medium"}:
+        issues.append("CPO 800G optical transceiver sample should be high or medium relevance")
+    cpo_merged = rank_and_limit_news_items(
+        [
+            {
+                "industry_id": "cpo_optical_module",
+                "title": f"Yahoo market stock update Nvidia Marvell Broadcom #{index}",
+                "publisher": "Yahoo",
+                "link": f"https://example.com/yahoo-{index}",
+                "published_at": f"2026-06-08T15:{index:02d}:00+00:00",
+                "related_tickers": ["NVDA"],
+                "matched_keywords": [],
+                "source": "Yahoo Finance",
+                "source_name": "Yahoo Finance",
+                "source_type": "ticker_news",
+                "source_quality": "medium",
+                "language": "en",
+            }
+            for index in range(20)
+        ]
+        + [
+            {
+                "industry_id": "cpo_optical_module",
+                "title": "800G optical transceiver demand rises for AI data centers",
+                "publisher": "Google",
+                "link": "https://example.com/google-cpo-1",
+                "published_at": "2026-06-08T16:01:00+00:00",
+                "related_tickers": [],
+                "matched_keywords": [],
+                "source": "Google News RSS",
+                "source_name": "Google News RSS",
+                "source_type": "search_rss",
+                "source_quality": "medium",
+                "language": "en",
+            },
+            {
+                "industry_id": "cpo_optical_module",
+                "title": "Silicon photonics optical interconnect advances for data center switches",
+                "publisher": "Google",
+                "link": "https://example.com/google-cpo-2",
+                "published_at": "2026-06-08T16:02:00+00:00",
+                "related_tickers": [],
+                "matched_keywords": [],
+                "source": "Google News RSS",
+                "source_name": "Google News RSS",
+                "source_type": "search_rss",
+                "source_quality": "medium",
+                "language": "en",
+            },
+        ],
+        "cpo_optical_module",
+        cpo_config.get("keywords", []),
+    )
+    merged_titles = {str(item.get("title", "")) for item in cpo_merged}
+    if "800G optical transceiver demand rises for AI data centers" not in merged_titles:
+        issues.append("CPO merge ranking dropped the 800G Google RSS high-relevance item")
+    if "Silicon photonics optical interconnect advances for data center switches" not in merged_titles:
+        issues.append("CPO merge ranking dropped the silicon photonics Google RSS high-relevance item")
+    if len([item for item in cpo_merged if item.get("relevance") == "low"]) >= len(cpo_merged):
+        issues.append("CPO merge ranking should not allow low relevance to fill the whole cache")
+    cpo_merged_metrics = enrich_news_metrics(
+        {
+            "industry_id": "cpo_optical_module",
+            "items": cpo_merged,
+            "last_updated": "2026-06-08T16:03:00+00:00",
+            "source": "Yahoo Finance, Google News RSS",
+            "source_names": ["Yahoo Finance", "Google News RSS"],
+            "source_types": ["ticker_news", "search_rss"],
+            "fetch_status": "available",
+            "failed_reason": "",
+        },
+        "cpo_optical_module",
+    )
+    if cpo_merged_metrics.get("live_news_count_7d", 0) <= 0:
+        issues.append("CPO merge ranking should produce live high/medium news count above zero")
     if gold_high.get("relevance") != "high":
         issues.append("Gold real-yields sample should be high relevance")
     fallback_config = industry_news_config("wind_power")
