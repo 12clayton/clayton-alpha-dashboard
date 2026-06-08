@@ -169,7 +169,7 @@ def build_framework_override_from_snapshot(
         "heat_level_zh": localized_heat_level(base_framework.get("heat_level")),
         "heat_direction": "Rising" if snapshot.get("review_status") == "reinforced" else base_framework.get("heat_direction"),
         "heat_direction_zh": "升温" if snapshot.get("review_status") == "reinforced" else localized_heat_direction(base_framework.get("heat_direction")),
-        "events": events or copy.deepcopy(base_framework.get("events") or []),
+        "events": events,
     }
 
 
@@ -307,6 +307,7 @@ def build_override_events(
             events[active_index]["descriptionZh"] = (
                 f"V4.12 动态快照显示这些催化线索获得实时新闻支持：{active_zh_text}。"
             )
+    return events
 
 
 def theme_names(themes: list[dict[str, Any]], language: str) -> list[str]:

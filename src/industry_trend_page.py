@@ -19,6 +19,7 @@ from src.industry_catalyst_data import (
 )
 from src.industry_catalyst_framework_store import (
     apply_snapshot_as_framework_override,
+    get_base_catalyst_framework,
     get_effective_catalyst_framework,
 )
 from src.industry_catalyst_review import build_catalyst_review
@@ -915,6 +916,10 @@ CATALYST_TEXT["zh"].update(
         "framework_base": "使用基础本地框架",
         "latest_framework_updated_at": "最新框架更新时间",
         "base_framework_dates": "基础框架记录日期",
+        "framework_events_updated": "事件表使用最新框架事件。",
+        "framework_summary_only_note": "当前更新仅包含摘要，事件仍沿用基础框架；基础框架记录日期仅作为历史说明。",
+        "framework_base_date_note": "当前框架摘要已更新；事件表中的日期仍为基础框架记录日期，仅作为历史说明，不代表更新未生效。",
+        "framework_no_events": "暂无可展示的催化事件。",
     }
 )
 CATALYST_TEXT["en"].update(
@@ -924,6 +929,10 @@ CATALYST_TEXT["en"].update(
         "framework_base": "Using Base Local Framework",
         "latest_framework_updated_at": "Latest Framework Updated At",
         "base_framework_dates": "Base Framework Record Dates",
+        "framework_events_updated": "The event table uses updated framework events.",
+        "framework_summary_only_note": "This update contains summary changes only; events still fall back to the base framework. Base framework record dates are historical context.",
+        "framework_base_date_note": "The framework summary has been updated; event dates shown here are still base framework record dates for historical context, not evidence that the update failed.",
+        "framework_no_events": "No catalyst events to display.",
     }
 )
 
@@ -958,8 +967,17 @@ def render_news_heat_catalysts(
     st.markdown(str(catalyst.get(summary_key) or catalyst.get("summary") or ""))
     render_catalyst_framework_meta(catalyst, lang)
 
+    events, uses_base_event_fallback = framework_events_for_display(industry, catalyst)
+    if catalyst.get("is_override"):
+        if uses_base_event_fallback:
+            st.info(text["framework_summary_only_note"])
+        elif framework_events_use_base_dates(catalyst, events):
+            st.info(text["framework_base_date_note"])
+        else:
+            st.caption(text["framework_events_updated"])
+
     rows = []
-    for event in catalyst.get("events", []):
+    for event in events:
         rows.append(
             {
                 text["date"]: event.get("date", ""),
@@ -978,6 +996,8 @@ def render_news_heat_catalysts(
         )
     if rows and mode in {"detailed", "developer"}:
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    elif mode in {"detailed", "developer"}:
+        st.info(text["framework_no_events"])
 
 
 def render_catalyst_framework_meta(catalyst: dict, lang: str) -> None:
@@ -990,6 +1010,54 @@ def render_catalyst_framework_meta(catalyst: dict, lang: str) -> None:
     if catalyst.get("is_override"):
         items.insert(1, (text["latest_framework_updated_at"], format_datetime_compact(catalyst.get("updated_at"), lang)))
     render_compact_info_items(items, columns=2)
+
+
+def framework_events_for_display(industry: dict, catalyst: dict) -> tuple[list[dict], bool]:
+    """Return events for the V4.1 table and whether they fall back to base events."""
+
+    events = [
+        event
+        for event in (catalyst.get("events") or [])
+        if isinstance(event, dict)
+    ]
+    if not catalyst.get("is_override"):
+        return events, False
+
+    override = catalyst.get("override") if isinstance(catalyst.get("override"), dict) else {}
+    override_events = override.get("events")
+    if isinstance(override_events, list) and not override_events:
+        base = get_base_catalyst_framework(str(industry.get("id", ""))) or {}
+        base_events = [
+            event
+            for event in (base.get("events") or [])
+            if isinstance(event, dict)
+        ]
+        return base_events, True
+
+    return events, False
+
+
+def framework_events_use_base_dates(catalyst: dict, events: list[dict]) -> bool:
+    """Detect overrides whose event rows still carry base framework record dates."""
+
+    if not catalyst.get("is_override") or not events:
+        return False
+    base_dates = {
+        str(item)
+        for item in (catalyst.get("base_framework_dates") or [])
+        if item
+    }
+    if not base_dates:
+        return False
+    event_dates = {
+        str(event.get("date", ""))
+        for event in events
+        if event.get("date")
+    }
+    if not event_dates or not event_dates.issubset(base_dates):
+        return False
+    updated_date = str(catalyst.get("updated_at") or "")[:10]
+    return bool(updated_date and updated_date not in event_dates)
 
 
 def render_news_heat_summary(catalyst: dict | None, live_news: dict, lang: str) -> None:
