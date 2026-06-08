@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.industry_catalyst_themes import normalize_catalyst_themes
+
 
 CATALYST_SNAPSHOT_DIR = Path(__file__).resolve().parents[1] / "data" / "industry_catalyst"
 LATEST_CATALYST_SNAPSHOT_PATH = CATALYST_SNAPSHOT_DIR / "latest_catalyst_snapshot.json"
@@ -27,8 +29,12 @@ SNAPSHOT_REQUIRED_FIELDS = [
     "evidence_level_zh",
     "active_catalysts",
     "active_catalysts_zh",
+    "active_catalyst_themes",
+    "active_catalyst_themes_zh",
     "emerging_catalysts",
     "emerging_catalysts_zh",
+    "emerging_catalyst_themes",
+    "emerging_catalyst_themes_zh",
     "cooling_catalysts",
     "cooling_catalysts_zh",
     "coverage_note",
@@ -71,6 +77,8 @@ def build_dynamic_catalyst_snapshot(
     review_emerging = [str(item) for item in catalyst_review.get("emerging_catalysts") or [] if item]
     weak_or_missing = [str(item) for item in catalyst_review.get("weak_or_missing_evidence") or [] if item]
     news_clues = extract_news_clues(live_news_data)
+    active_themes = catalyst_review.get("active_catalyst_themes") or normalize_catalyst_themes(industry_id, supported, language)
+    emerging_themes = catalyst_review.get("emerging_catalyst_themes") or normalize_catalyst_themes(industry_id, review_emerging or news_clues, language)
 
     active = supported if status in {"reinforced", "stable"} else []
     emerging = unique_keep_order([*review_emerging, *[item for item in news_clues if item not in set(active)]])
@@ -89,8 +97,12 @@ def build_dynamic_catalyst_snapshot(
         "evidence_level_zh": str(catalyst_review.get("evidence_level_zh") or EVIDENCE_ZH.get(evidence, evidence)),
         "active_catalysts": active,
         "active_catalysts_zh": active,
+        "active_catalyst_themes": active_themes if status in {"reinforced", "stable"} else [],
+        "active_catalyst_themes_zh": active_themes if status in {"reinforced", "stable"} else [],
         "emerging_catalysts": emerging[:8],
         "emerging_catalysts_zh": emerging[:8],
+        "emerging_catalyst_themes": emerging_themes[:6],
+        "emerging_catalyst_themes_zh": emerging_themes[:6],
         "cooling_catalysts": cooling[:8],
         "cooling_catalysts_zh": cooling[:8],
         "coverage_note": snapshot_coverage_note(status, catalyst_review, "en"),

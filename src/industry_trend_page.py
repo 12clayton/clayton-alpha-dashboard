@@ -27,6 +27,7 @@ from src.industry_catalyst_snapshot import (
     read_dynamic_catalyst_snapshot,
     save_dynamic_catalyst_snapshot,
 )
+from src.industry_catalyst_themes import theme_display_name, theme_reason
 from src.industry_export import build_industry_export_context, build_industry_json, build_industry_markdown
 from src.industry_market_data import get_market_confirmation_data
 from src.industry_news_provider import read_industry_news, refresh_industry_news
@@ -1144,12 +1145,16 @@ CATALYST_SNAPSHOT_TEXT = {
 
 CATALYST_SNAPSHOT_TEXT["zh"].update(
     {
+        "active": "当前活跃催化主题",
+        "emerging": "新出现催化主题",
         "apply_framework": "应用为最新催化框架",
         "apply_success": "已应用为最新催化框架。页面刷新后 V4.1 将显示更新后的框架。",
     }
 )
 CATALYST_SNAPSHOT_TEXT["en"].update(
     {
+        "active": "Active Catalyst Themes",
+        "emerging": "Emerging Catalyst Themes",
         "apply_framework": "Apply as Latest Catalyst Framework",
         "apply_success": "Applied as latest catalyst framework. V4.1 will show the updated framework after refresh.",
     }
@@ -1217,18 +1222,32 @@ def render_dynamic_catalyst_snapshot(
     coverage = snapshot.get("coverage_note_zh") if lang == "zh" else snapshot.get("coverage_note")
     st.markdown(f"**{text['one_line']}**: {one_line or text['none']}")
     st.caption(f"{text['coverage']}: {coverage or text['none']}")
-    rows = [
-        (text["active"], snapshot.get("active_catalysts_zh") if lang == "zh" else snapshot.get("active_catalysts")),
-        (text["emerging"], snapshot.get("emerging_catalysts_zh") if lang == "zh" else snapshot.get("emerging_catalysts")),
-        (text["cooling"], snapshot.get("cooling_catalysts_zh") if lang == "zh" else snapshot.get("cooling_catalysts")),
-    ]
-    for label, values in rows:
-        value_text = ", ".join(str(value) for value in (values or [])) if values else text["none"]
-        st.markdown(f"**{label}**: {value_text}")
+    render_catalyst_theme_group(text["active"], snapshot.get("active_catalyst_themes") or [], lang, text["none"])
+    render_catalyst_theme_group(text["emerging"], snapshot.get("emerging_catalyst_themes") or [], lang, text["none"])
+    cooling_values = snapshot.get("cooling_catalysts_zh") if lang == "zh" else snapshot.get("cooling_catalysts")
+    cooling_text = ", ".join(str(value) for value in (cooling_values or [])) if cooling_values else text["none"]
+    st.markdown(f"**{text['cooling']}**: {cooling_text}")
     if st.button(text["apply_framework"], key=f"apply_catalyst_framework_{industry_id}", width="content"):
         apply_snapshot_as_framework_override(industry_id, None, snapshot, catalyst_review, live_news)
         st.success(text["apply_success"])
         st.rerun()
+
+
+def render_catalyst_theme_group(label: str, themes: list[dict], lang: str, empty_text: str) -> None:
+    """Render normalized catalyst themes instead of raw keyword strings."""
+
+    st.markdown(f"**{label}**")
+    if not themes:
+        st.caption(empty_text)
+        return
+    for theme in themes:
+        terms = ", ".join(str(item) for item in (theme.get("matched_terms") or [])[:6])
+        reason = theme_reason(theme, lang)
+        name = theme_display_name(theme, lang)
+        suffix = f"（{terms}）" if lang == "zh" and terms else f" ({terms})" if terms else ""
+        st.markdown(f"- **{name}**{suffix}")
+        if reason:
+            st.caption(reason)
 
 
 def render_catalyst_event_guide(lang: str, title_override: str | None = None, wrap: bool = True) -> None:

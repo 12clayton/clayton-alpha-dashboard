@@ -179,6 +179,8 @@ MARKDOWN_LABELS["zh"].update(
         "framework_record_dates": "本地框架记录日期",
         "dynamic_status": "动态状态",
         "active_catalysts": "当前活跃催化",
+        "active_catalyst_themes": "当前活跃催化主题",
+        "emerging_catalyst_themes": "新出现催化主题",
         "cooling_catalysts": "降温催化线索",
         "one_line_snapshot": "一句话快照",
         "coverage_note": "覆盖说明",
@@ -193,6 +195,8 @@ MARKDOWN_LABELS["en"].update(
         "framework_record_dates": "framework_record_dates",
         "dynamic_status": "dynamic_status",
         "active_catalysts": "active_catalysts",
+        "active_catalyst_themes": "active_catalyst_themes",
+        "emerging_catalyst_themes": "emerging_catalyst_themes",
         "cooling_catalysts": "cooling_catalysts",
         "one_line_snapshot": "one_line_snapshot",
         "coverage_note": "coverage_note",
@@ -389,6 +393,8 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     lines.append(f"- {labels['review_status']}: {review_status or na}")
     lines.append(f"- {labels['evidence_level']}: {evidence_level or na}")
     lines.append(f"- {labels['one_line_review']}: {one_line_review or na}")
+    lines.append(f"- {labels['active_catalyst_themes']}: {format_export_value(format_theme_names(catalyst_review.get('active_catalyst_themes'), lang), na)}")
+    lines.append(f"- {labels['emerging_catalyst_themes']}: {format_export_value(format_theme_names(catalyst_review.get('emerging_catalyst_themes'), lang), na)}")
     lines.append(f"- {labels['supported_catalysts']}: {format_export_value(catalyst_review.get('supported_catalysts'), na)}")
     lines.append(f"- {labels['emerging_catalysts']}: {format_export_value(catalyst_review.get('emerging_catalysts'), na)}")
     lines.append(f"- {labels['weak_or_missing_evidence']}: {format_export_value(weak_note, na)}")
@@ -406,6 +412,8 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
     lines.append(f"- {labels['dynamic_status']}: {snapshot_status or na}")
     lines.append(f"- {labels['evidence_level']}: {snapshot_evidence or na}")
     lines.append(f"- {labels['one_line_snapshot']}: {snapshot_one_line or na}")
+    lines.append(f"- {labels['active_catalyst_themes']}: {format_export_value(format_theme_names(dynamic_snapshot.get('active_catalyst_themes'), lang), na)}")
+    lines.append(f"- {labels['emerging_catalyst_themes']}: {format_export_value(format_theme_names(dynamic_snapshot.get('emerging_catalyst_themes'), lang), na)}")
     lines.append(f"- {labels['active_catalysts']}: {format_export_value(dynamic_snapshot.get(active_key), na)}")
     lines.append(f"- {labels['emerging_catalysts']}: {format_export_value(dynamic_snapshot.get(emerging_key), na)}")
     lines.append(f"- {labels['cooling_catalysts']}: {format_export_value(dynamic_snapshot.get(cooling_key), na)}")
@@ -471,6 +479,9 @@ def normalize_catalyst_review(review: dict[str, Any] | None) -> dict[str, Any] |
         "evidence_level_zh": review.get("evidence_level_zh"),
         "supported_catalysts": review.get("supported_catalysts") or [],
         "emerging_catalysts": review.get("emerging_catalysts") or [],
+        "raw_matched_keywords": review.get("raw_matched_keywords") or [],
+        "active_catalyst_themes": review.get("active_catalyst_themes") or [],
+        "emerging_catalyst_themes": review.get("emerging_catalyst_themes") or [],
         "weak_or_missing_evidence": review.get("weak_or_missing_evidence") or [],
         "coverage_note": review.get("coverage_note"),
         "coverage_note_zh": review.get("coverage_note_zh"),
@@ -493,8 +504,12 @@ def normalize_dynamic_catalyst_snapshot(snapshot: dict[str, Any] | None) -> dict
         "evidence_level_zh": snapshot.get("evidence_level_zh"),
         "active_catalysts": snapshot.get("active_catalysts") or [],
         "active_catalysts_zh": snapshot.get("active_catalysts_zh") or [],
+        "active_catalyst_themes": snapshot.get("active_catalyst_themes") or [],
+        "active_catalyst_themes_zh": snapshot.get("active_catalyst_themes_zh") or [],
         "emerging_catalysts": snapshot.get("emerging_catalysts") or [],
         "emerging_catalysts_zh": snapshot.get("emerging_catalysts_zh") or [],
+        "emerging_catalyst_themes": snapshot.get("emerging_catalyst_themes") or [],
+        "emerging_catalyst_themes_zh": snapshot.get("emerging_catalyst_themes_zh") or [],
         "cooling_catalysts": snapshot.get("cooling_catalysts") or [],
         "cooling_catalysts_zh": snapshot.get("cooling_catalysts_zh") or [],
         "coverage_note": snapshot.get("coverage_note"),
@@ -594,6 +609,18 @@ def format_drivers(drivers: list[dict[str, Any]], lang: str) -> list[str]:
         if name and explanation:
             output.append(f"{name}：{explanation}" if lang == "zh" else f"{name}: {explanation}")
         elif name:
+            output.append(str(name))
+    return output
+
+
+def format_theme_names(themes: list[dict[str, Any]] | None, lang: str) -> list[str]:
+    output = []
+    for theme in themes or []:
+        if lang == "zh":
+            name = theme.get("theme_zh") or theme.get("theme")
+        else:
+            name = theme.get("theme") or theme.get("theme_zh")
+        if name:
             output.append(str(name))
     return output
 

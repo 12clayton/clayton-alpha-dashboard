@@ -93,6 +93,24 @@ def main() -> int:
         "evidence_level": "medium",
         "active_catalysts": ["AI chip"],
         "emerging_catalysts": ["DRAM", "SK Hynix"],
+        "active_catalyst_themes": [
+            {
+                "theme": "AI chip-chain diffusion",
+                "theme_zh": "AI 芯片链条扩散",
+                "matched_terms": ["AI chip"],
+                "reason": "audit",
+                "reason_zh": "审计",
+            }
+        ],
+        "emerging_catalyst_themes": [
+            {
+                "theme": "HBM / DRAM memory-chain reinforcement",
+                "theme_zh": "HBM / DRAM 存储链强化",
+                "matched_terms": ["DRAM", "SK Hynix"],
+                "reason": "audit",
+                "reason_zh": "审计",
+            }
+        ],
         "one_line_snapshot": "Audit snapshot",
         "one_line_snapshot_zh": "审计快照",
         "coverage_note": "Audit coverage",
@@ -108,6 +126,9 @@ def main() -> int:
             issues.append("generated effective framework should be override")
         if not generated.get("events"):
             issues.append("generated override should include events")
+        titles_zh = [event.get("titleZh", "") for event in generated.get("events", [])]
+        if not any("HBM / DRAM 存储链强化" in title for title in titles_zh):
+            issues.append("generated override event title should use normalized catalyst theme")
     except Exception as exc:
         issues.append(f"apply snapshot as override raised: {exc}")
     finally:

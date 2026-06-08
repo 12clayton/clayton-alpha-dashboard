@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from src.industry_catalyst_data import get_catalyst_data
+from src.industry_catalyst_themes import theme_display_name
 
 
 CATALYST_STORE_DIR = Path(__file__).resolve().parents[1] / "data" / "industry_catalyst"
@@ -136,12 +137,27 @@ def build_framework_override_from_snapshot(
     updated_at = datetime.now().isoformat(timespec="seconds")
     active = [str(item) for item in snapshot.get("active_catalysts") or [] if item]
     emerging = [str(item) for item in snapshot.get("emerging_catalysts") or [] if item]
+    active_themes = snapshot.get("active_catalyst_themes") or []
+    emerging_themes = snapshot.get("emerging_catalyst_themes") or []
+    active_theme_names_zh = theme_names(active_themes, "zh") or active
+    active_theme_names = theme_names(active_themes, "en") or active
+    emerging_theme_names_zh = theme_names(emerging_themes, "zh") or emerging
+    emerging_theme_names = theme_names(emerging_themes, "en") or emerging
     one_line_zh = str(snapshot.get("one_line_snapshot_zh") or "")
     one_line = str(snapshot.get("one_line_snapshot") or "")
-    summary_zh = build_override_summary(active, emerging, one_line_zh, "zh")
-    summary = build_override_summary(active, emerging, one_line, "en")
+    summary_zh = build_override_summary(active_theme_names_zh, emerging_theme_names_zh, one_line_zh, "zh")
+    summary = build_override_summary(active_theme_names, emerging_theme_names, one_line, "en")
     evidence = str(snapshot.get("evidence_level") or catalyst_review.get("evidence_level") or "medium")
-    events = build_override_events(today, active, emerging, evidence, snapshot, live_news)
+    events = build_override_events(
+        today,
+        active_theme_names,
+        emerging_theme_names,
+        evidence,
+        snapshot,
+        live_news,
+        active_zh=active_theme_names_zh,
+        emerging_zh=emerging_theme_names_zh,
+    )
     return {
         "updated_at": updated_at,
         "source": "V4.12 Dynamic Catalyst Snapshot",
@@ -229,8 +245,12 @@ def build_override_events(
     evidence: str,
     snapshot: dict[str, Any],
     live_news: dict[str, Any],
+    active_zh: list[str] | None = None,
+    emerging_zh: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     events = []
+    active_zh = active_zh or active
+    emerging_zh = emerging_zh or emerging
     confidence = "high" if evidence == "high" else "medium"
     confidence_zh = "高" if evidence == "high" else "中"
     if emerging:
@@ -269,7 +289,28 @@ def build_override_events(
                 "高",
             )
         )
+    if emerging and events:
+        events[0]["titleZh"] = f"{emerging[0]}成为新增催化线索"
+        events[0]["title"] = f"{emerging[0]} becomes an emerging catalyst clue"
+        events[0]["titleZh"] = f"{emerging_zh[0]}\u6210\u4e3a\u65b0\u589e\u50ac\u5316\u7ebf\u7d22"
+        events[0]["descriptionZh"] = (
+            f"V4.12 \u52a8\u6001\u5feb\u7167\u8bc6\u522b\u5230\u65b0\u589e\u7ebf\u7d22\uff1a"
+            f"{'\u3001'.join(emerging_zh[:8])}\u3002"
+        )
+    if active:
+        active_index = 1 if emerging and len(events) > 1 else 0
+        if active_index < len(events):
+            events[active_index]["titleZh"] = f"{active[0]}获得实时新闻验证"
+            events[active_index]["title"] = f"{active[0]} validated by live news"
+            events[active_index]["titleZh"] = f"{active_zh[0]}\u83b7\u5f97\u5b9e\u65f6\u65b0\u95fb\u9a8c\u8bc1"
+            events[active_index]["descriptionZh"] = (
+                f"\u5f53\u524d\u6d3b\u8dc3\u50ac\u5316\u5305\u62ec\uff1a{'\u3001'.join(active_zh[:8])}\u3002"
+            )
     return events[:3]
+
+
+def theme_names(themes: list[dict[str, Any]], language: str) -> list[str]:
+    return [theme_display_name(theme, language) for theme in themes if theme_display_name(theme, language)]
 
 
 def framework_event(

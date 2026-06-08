@@ -20,6 +20,7 @@ from src.industry_catalyst_review import (  # noqa: E402
     REVIEW_STATUSES,
     build_catalyst_review,
 )
+from src.industry_catalyst_themes import normalize_catalyst_themes  # noqa: E402
 
 
 REQUIRED_FIELDS = [
@@ -96,6 +97,34 @@ def main() -> int:
         issues.append(f"CPO keyword-matched news should be stable or reinforced, got {cpo_news_review.get('review_status')}")
     if not cpo_news_review.get("supported_catalysts"):
         issues.append("CPO keyword-matched news should populate supported_catalysts")
+    semiconductor_themes = normalize_catalyst_themes(
+        "semiconductor",
+        ["SK Hynix", "DRAM", "Micron", "AI chip", "Broadcom"],
+        language="zh",
+    )
+    semiconductor_theme_names = {item.get("theme_zh") for item in semiconductor_themes}
+    if "HBM / DRAM 存储链强化" not in semiconductor_theme_names:
+        issues.append("semiconductor memory keywords should map to HBM / DRAM theme")
+    if "AI 芯片链条扩散" not in semiconductor_theme_names:
+        issues.append("semiconductor AI chip keywords should map to AI chip-chain theme")
+
+    cpo_themes = normalize_catalyst_themes("cpo_optical_module", ["CPO", "silicon photonics"], language="zh")
+    cpo_theme_names = {item.get("theme_zh") for item in cpo_themes}
+    if "CPO 技术路线验证" not in cpo_theme_names:
+        issues.append("CPO keyword should map to CPO technology-route theme")
+    if "硅光路线推进" not in cpo_theme_names:
+        issues.append("silicon photonics should map to silicon photonics theme")
+
+    gold_themes = normalize_catalyst_themes("gold", ["real yields", "dollar", "central bank buying"], language="zh")
+    gold_theme_names = {item.get("theme_zh") for item in gold_themes}
+    if "美元与实际利率压力" not in gold_theme_names:
+        issues.append("gold real-yield keywords should map to dollar/real-yield theme")
+    if "央行购金支撑" not in gold_theme_names:
+        issues.append("gold central-bank keywords should map to central-bank support theme")
+
+    broad_fallback = normalize_catalyst_themes("unknown_theme", ["technology", "market", "stock"], language="zh")
+    if broad_fallback:
+        issues.append("broad fallback terms should not become default themes")
 
     print_report("CATALYST REVIEW SAMPLE", review)
     print_report("CPO REVIEW SAMPLE", cpo_news_review)

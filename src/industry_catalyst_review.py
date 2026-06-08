@@ -10,6 +10,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from src.industry_catalyst_themes import normalize_catalyst_themes
+
 
 REVIEW_STATUSES = {"reinforced", "stable", "diverging", "weakening", "insufficient_evidence"}
 EVIDENCE_LEVELS = {"high", "medium", "low", "insufficient"}
@@ -149,6 +151,8 @@ def build_catalyst_review(
     matched_keywords = collect_news_matches(news_items, keywords)
     supported = supported_catalysts_for(industry_id, matched_keywords, language)
     emerging = collect_emerging_keywords(news_items, keywords)
+    active_themes = normalize_catalyst_themes(industry_id, matched_keywords, language)
+    emerging_themes = normalize_catalyst_themes(industry_id, emerging, language)
     heat_score = to_float(catalyst_data.get("heat_score"))
     heat_direction = str(catalyst_data.get("heat_direction") or "")
     negative_count = sum(1 for item in news_items if str(item.get("impact", "")).lower() == "negative")
@@ -182,6 +186,9 @@ def build_catalyst_review(
         "evidence_level_zh": EVIDENCE_LABELS_ZH[evidence],
         "supported_catalysts": supported,
         "emerging_catalysts": emerging,
+        "raw_matched_keywords": sorted(matched_keywords),
+        "active_catalyst_themes": active_themes,
+        "emerging_catalyst_themes": emerging_themes,
         "weak_or_missing_evidence": weak_or_missing,
         "coverage_note": coverage_note,
         "coverage_note_zh": coverage_note_zh,
