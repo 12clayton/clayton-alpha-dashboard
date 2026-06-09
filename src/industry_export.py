@@ -384,7 +384,6 @@ def build_industry_markdown(context: dict[str, Any], lang: str) -> str:
         )
         if description:
             lines.append(f"    - {description}")
-    lines.append(f"- {labels['effective_framework_events']}: {format_export_value(framework.get('events'), na)}")
     lines.extend(["", f"## {text['catalyst_review']}"])
     review_status = localized_review_value(catalyst_review, "review_status", lang)
     evidence_level = localized_review_value(catalyst_review, "evidence_level", lang)

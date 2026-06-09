@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from src.industry_catalyst_themes import theme_display_name
 
 CATALYST_STORE_DIR = Path(__file__).resolve().parents[1] / "data" / "industry_catalyst"
 FRAMEWORK_OVERRIDES_PATH = CATALYST_STORE_DIR / "framework_overrides.json"
+LATEST_CATALYST_SNAPSHOT_PATH = CATALYST_STORE_DIR / "latest_catalyst_snapshot.json"
 
 FRAMEWORK_REQUIRED_FIELDS = [
     "heat_score",
@@ -31,6 +33,72 @@ FRAMEWORK_REQUIRED_FIELDS = [
     "updated_at",
     "base_framework_dates",
 ]
+
+INVALID_CATALYST_THEME_TERMS = {
+    "news",
+    "technology",
+    "market",
+    "stock",
+    "stocks",
+    "shares",
+    "company",
+    "companies",
+    "industry",
+    "sector",
+    "report",
+    "analysis",
+    "analyst",
+    "data",
+    "provides",
+    "include",
+    "active",
+    "catalyst",
+    "themes",
+    "emerging",
+    "latest",
+    "update",
+    "business",
+    "finance",
+    "新闻",
+    "技术",
+    "市场",
+    "股票",
+    "公司",
+    "行业",
+    "板块",
+    "报告",
+    "分析",
+    "主题",
+    "催化",
+    "线索",
+    "更新",
+}
+
+EVENT_TYPE_ZH = {
+    "macro": "宏观",
+    "rates": "利率",
+    "monetary_policy": "货币政策",
+    "safe_haven": "避险",
+    "central_bank_demand": "央行需求",
+    "capex": "资本开支",
+    "demand": "需求",
+    "supply_chain": "供应链",
+    "product": "产品",
+    "technology": "技术",
+    "price_cycle": "价格周期",
+    "policy": "政策",
+    "risk": "风险",
+    "mixed": "混合",
+}
+
+IMPACT_ZH = {
+    "positive": "正面",
+    "neutral": "中性",
+    "negative": "负面",
+    "mixed": "混合",
+}
+
+CONFIDENCE_ZH = {"high": "高", "medium": "中", "low": "低"}
 
 
 def ensure_framework_store() -> Path:
@@ -100,7 +168,7 @@ def get_effective_catalyst_framework(industry_id: str) -> dict[str, Any] | None:
     effective["is_override"] = True
     effective["override"] = copy.deepcopy(override)
     effective["base_framework_dates"] = override.get("base_framework_dates") or base.get("base_framework_dates") or []
-    return normalize_effective_framework(effective)
+    return reconcile_effective_framework_with_snapshot(industry_id, normalize_effective_framework(effective))
 
 
 def write_framework_override(industry_id: str, override: dict[str, Any]) -> dict[str, Any]:
@@ -135,20 +203,21 @@ def build_framework_override_from_snapshot(
     live_news = live_news or {}
     today = datetime.now().strftime("%Y-%m-%d")
     updated_at = datetime.now().isoformat(timespec="seconds")
-    active = [str(item) for item in snapshot.get("active_catalysts") or [] if item]
-    emerging = [str(item) for item in snapshot.get("emerging_catalysts") or [] if item]
+    active = clean_catalyst_names([str(item) for item in snapshot.get("active_catalysts") or [] if item])
+    emerging = clean_catalyst_names([str(item) for item in snapshot.get("emerging_catalysts") or [] if item])
     active_themes = snapshot.get("active_catalyst_themes") or []
     emerging_themes = snapshot.get("emerging_catalyst_themes") or []
-    active_theme_names_zh = theme_names(active_themes, "zh") or active
-    active_theme_names = theme_names(active_themes, "en") or active
-    emerging_theme_names_zh = theme_names(emerging_themes, "zh") or emerging
-    emerging_theme_names = theme_names(emerging_themes, "en") or emerging
+    active_theme_names_zh = clean_catalyst_names(theme_names(active_themes, "zh")) or active
+    active_theme_names = clean_catalyst_names(theme_names(active_themes, "en")) or active
+    emerging_theme_names_zh = clean_catalyst_names(theme_names(emerging_themes, "zh")) or emerging
+    emerging_theme_names = clean_catalyst_names(theme_names(emerging_themes, "en")) or emerging
     one_line_zh = str(snapshot.get("one_line_snapshot_zh") or "")
     one_line = str(snapshot.get("one_line_snapshot") or "")
     summary_zh = build_override_summary(active_theme_names_zh, emerging_theme_names_zh, one_line_zh, "zh")
     summary = build_override_summary(active_theme_names, emerging_theme_names, one_line, "en")
     evidence = str(snapshot.get("evidence_level") or catalyst_review.get("evidence_level") or "medium")
-    events = build_override_events(
+    events = build_semantic_override_events(
+        industry_id,
         today,
         active_theme_names,
         emerging_theme_names,
@@ -207,6 +276,108 @@ def normalize_effective_framework(framework: dict[str, Any]) -> dict[str, Any]:
     output.setdefault("updated_at", "")
     output.setdefault("is_override", False)
     return output
+
+
+def reconcile_effective_framework_with_snapshot(industry_id: str, framework: dict[str, Any]) -> dict[str, Any]:
+    """Keep old overrides consistent with the latest V4.12 snapshot at read time."""
+
+    if not framework.get("is_override"):
+        return framework
+    snapshot = read_latest_catalyst_snapshot(industry_id)
+    if (
+        not snapshot
+        or not snapshot_is_newer_than_framework(snapshot, framework)
+        or not needs_snapshot_event_rebuild(framework.get("events") or [], snapshot)
+    ):
+        return framework
+
+    active = clean_catalyst_names(snapshot.get("active_catalysts") or [])
+    emerging = clean_catalyst_names(snapshot.get("emerging_catalysts") or [])
+    active_themes = snapshot.get("active_catalyst_themes") or []
+    emerging_themes = snapshot.get("emerging_catalyst_themes") or []
+    active_theme_names_zh = clean_catalyst_names(theme_names(active_themes, "zh")) or active
+    active_theme_names = clean_catalyst_names(theme_names(active_themes, "en")) or active
+    emerging_theme_names_zh = clean_catalyst_names(theme_names(emerging_themes, "zh")) or emerging
+    emerging_theme_names = clean_catalyst_names(theme_names(emerging_themes, "en")) or emerging
+    event_date = str(snapshot.get("snapshot_generated_at") or framework.get("updated_at") or datetime.now().date())[:10]
+    evidence = str(snapshot.get("evidence_level") or "medium")
+    rebuilt = copy.deepcopy(framework)
+    rebuilt["events"] = build_semantic_override_events(
+        industry_id,
+        event_date,
+        active_theme_names,
+        emerging_theme_names,
+        evidence,
+        snapshot,
+        {"live_news_count_7d": snapshot_news_count(snapshot)},
+        active_zh=active_theme_names_zh,
+        emerging_zh=emerging_theme_names_zh,
+    )
+    rebuilt["summaryZh"] = build_override_summary(
+        active_theme_names_zh,
+        emerging_theme_names_zh,
+        str(snapshot.get("one_line_snapshot_zh") or ""),
+        "zh",
+    )
+    rebuilt["summary"] = build_override_summary(
+        active_theme_names,
+        emerging_theme_names,
+        str(snapshot.get("one_line_snapshot") or ""),
+        "en",
+    )
+    return rebuilt
+
+
+def read_latest_catalyst_snapshot(industry_id: str) -> dict[str, Any] | None:
+    if not LATEST_CATALYST_SNAPSHOT_PATH.exists():
+        return None
+    try:
+        payload = json.loads(LATEST_CATALYST_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    snapshot = payload.get("industries", {}).get(industry_id) if isinstance(payload, dict) else None
+    return snapshot if isinstance(snapshot, dict) else None
+
+
+def snapshot_is_newer_than_framework(snapshot: dict[str, Any], framework: dict[str, Any]) -> bool:
+    snapshot_time = str(snapshot.get("snapshot_generated_at") or "")
+    framework_time = str(framework.get("updated_at") or "")
+    if not snapshot_time or not framework_time:
+        return bool(snapshot_time)
+    return snapshot_time > framework_time
+
+
+def needs_snapshot_event_rebuild(events: list[dict[str, Any]], snapshot: dict[str, Any]) -> bool:
+    status = str(snapshot.get("review_status") or "")
+    evidence = normalize_evidence_level(snapshot.get("evidence_level"))
+    has_active = bool(snapshot.get("active_catalyst_themes") or snapshot.get("active_catalysts"))
+    event_text = " ".join(
+        str(event.get(key) or "")
+        for event in events
+        for key in ("title", "titleZh", "description", "descriptionZh")
+    ).lower()
+    has_low_divergence = any(event.get("confidence") == "low" for event in events) and any(
+        term in event_text
+        for term in ("diverge", "diverging", "待验证", "分化", "å¾…éªŒè¯", "åˆ†åŒ–")
+    )
+    has_strong_positive_high = any(
+        event.get("impact") == "positive" and event.get("confidence") == "high"
+        for event in events
+    ) and any(
+        term in event_text
+        for term in ("strongly validates", "较强验证", "å½¢æˆè¾ƒå¼ºéªŒè¯")
+    )
+    if status == "reinforced" and evidence == "high" and has_active and has_low_divergence:
+        return True
+    if (status in {"diverging", "weakening", "insufficient_evidence"} or evidence == "low") and has_strong_positive_high:
+        return True
+    return False
+
+
+def snapshot_news_count(snapshot: dict[str, Any]) -> int:
+    text = " ".join(str(snapshot.get(key) or "") for key in ("coverage_note", "coverage_note_zh"))
+    match = re.search(r"(\d+)", text)
+    return int(match.group(1)) if match else 0
 
 
 def framework_record_dates(framework: dict[str, Any]) -> list[str]:
@@ -310,8 +481,296 @@ def build_override_events(
     return events
 
 
+def build_semantic_override_events(
+    industry_id: str,
+    today: str,
+    active: list[str],
+    emerging: list[str],
+    evidence: str,
+    snapshot: dict[str, Any],
+    live_news: dict[str, Any],
+    active_zh: list[str] | None = None,
+    emerging_zh: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Build V4.1 override events with status-aware semantics."""
+
+    events: list[dict[str, Any]] = []
+    status = str(snapshot.get("review_status") or "")
+    evidence = normalize_evidence_level(evidence)
+    active = clean_catalyst_names(active)
+    emerging = clean_catalyst_names(emerging)
+    active_zh = clean_catalyst_names(active_zh or active)
+    emerging_zh = clean_catalyst_names(emerging_zh or emerging)
+    high_medium_news_count = count_high_medium_news(live_news)
+    can_strongly_validate = (
+        status == "reinforced"
+        and evidence == "high"
+        and bool(active)
+        and high_medium_news_count >= 3
+    )
+    has_reinforced_active_evidence = status == "reinforced" and evidence == "high" and bool(active)
+
+    if status == "insufficient_evidence" and not emerging:
+        return []
+
+    if active and status in {"reinforced", "stable"}:
+        first = active[0]
+        first_zh = active_zh[0] if active_zh else first
+        event_type = infer_event_type(industry_id, [*active, *active_zh])
+        impact = infer_event_impact(status, evidence, has_active=True, strong_validation=can_strongly_validate)
+        confidence = infer_event_confidence(
+            evidence,
+            status,
+            high_medium_news_count,
+            has_active=True,
+            strong_validation=can_strongly_validate,
+        )
+        events.append(
+            semantic_framework_event(
+                today,
+                f"{first_zh}获得实时新闻支持",
+                f"{first} receives live-news support",
+                f"V4.12 动态快照显示当前状态为强化、证据强度较高，活跃催化线索获得实时新闻支持：{'、'.join(active_zh[:8])}。",
+                f"V4.12 dynamic snapshot is reinforced with high evidence; active catalyst themes receive live-news support: {', '.join(active[:8])}.",
+                event_type,
+                impact,
+                confidence,
+            )
+        )
+
+    if emerging and not has_reinforced_active_evidence:
+        first = emerging[0]
+        first_zh = emerging_zh[0] if emerging_zh else first
+        event_type = infer_event_type(industry_id, [*emerging, *emerging_zh])
+        impact = infer_event_impact(status, evidence, has_active=bool(active), strong_validation=False)
+        confidence = infer_event_confidence(
+            evidence,
+            status,
+            high_medium_news_count,
+            has_active=False,
+            strong_validation=False,
+        )
+        events.append(
+            semantic_framework_event(
+                today,
+                f"{first_zh}成为新线索待验证",
+                f"{first} remains an emerging clue for validation",
+                f"V4.12 动态快照识别到新线索：{'、'.join(emerging_zh[:8]) or '暂无明确新增线索'}；需要继续观察其与本地框架的匹配度。",
+                f"V4.12 dynamic snapshot identified emerging clues: {', '.join(emerging[:8]) or 'no clear emerging clue'}; fit with the local framework still needs validation.",
+                event_type,
+                impact,
+                confidence,
+            )
+        )
+
+    if status == "diverging":
+        clues = emerging_zh or clean_catalyst_names(snapshot.get("emerging_catalysts_zh") or [])
+        clue_text_zh = "、".join(clues[:6]) or "新催化线索"
+        clue_text = ", ".join((emerging or clues)[:6]) or "new catalyst clues"
+        event_type = infer_event_type(industry_id, [*emerging, *clues])
+        events.append(
+            semantic_framework_event(
+                today,
+                "出现新催化线索，但与本地框架存在分化",
+                "Emerging clues diverge from the local framework",
+                f"V4.12 显示 {clue_text_zh} 仍处于分化或待验证状态，不生成强验证结论。",
+                f"V4.12 shows {clue_text} remains diverging or unvalidated, so no strong validation event is generated.",
+                event_type,
+                "mixed",
+                "low" if evidence == "low" else "medium",
+            )
+        )
+
+    if status == "insufficient_evidence" and emerging:
+        for event in events:
+            event["impact"] = "neutral"
+            event["impactZh"] = IMPACT_ZH["neutral"]
+            event["confidence"] = "low"
+            event["confidenceZh"] = CONFIDENCE_ZH["low"]
+
+    if can_strongly_validate:
+        event_type = infer_event_type(industry_id, [*active, *active_zh])
+        events.append(
+            semantic_framework_event(
+                today,
+                "实时新闻对本地框架形成较强验证",
+                "Live news strongly validates the local catalyst framework",
+                str(snapshot.get("coverage_note_zh") or "当前实时新闻对本地框架形成较强验证，但仍需结合价格确认观察。"),
+                str(snapshot.get("coverage_note") or "Current live news strongly validates the local framework, while price confirmation still needs monitoring."),
+                event_type,
+                "positive",
+                "high",
+            )
+        )
+
+    return events
+
+
 def theme_names(themes: list[dict[str, Any]], language: str) -> list[str]:
-    return [theme_display_name(theme, language) for theme in themes if theme_display_name(theme, language)]
+    return clean_catalyst_names([theme_display_name(theme, language) for theme in themes])
+
+
+def clean_catalyst_names(values: list[Any] | tuple[Any, ...] | set[Any] | None) -> list[str]:
+    output = []
+    for value in values or []:
+        text = str(value).strip()
+        if not text or is_invalid_catalyst_theme(text):
+            continue
+        output.append(text)
+    return unique_keep_order(output)
+
+
+def is_invalid_catalyst_theme(value: str) -> bool:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return True
+    compact = normalized.replace(" ", "").replace("_", "")
+    if normalized in INVALID_CATALYST_THEME_TERMS or compact in INVALID_CATALYST_THEME_TERMS:
+        return True
+    return len(normalized) < 3 and not any("\u4e00" <= char <= "\u9fff" for char in normalized)
+
+
+def normalize_evidence_level(value: Any) -> str:
+    raw = str(value or "").strip().lower()
+    if raw in {"high", "medium", "low"}:
+        return raw
+    if raw in {"insufficient", "none", "missing"}:
+        return "low"
+    return "medium"
+
+
+def count_high_medium_news(live_news: dict[str, Any]) -> int:
+    explicit = live_news.get("live_news_count_7d")
+    if isinstance(explicit, int):
+        return explicit
+    count = 0
+    for item in live_news.get("items", []) or []:
+        if isinstance(item, dict) and item.get("relevance", "high") in {"high", "medium"}:
+            count += 1
+    return count
+
+
+def infer_event_impact(status: str, evidence: str, *, has_active: bool, strong_validation: bool) -> str:
+    if status == "reinforced":
+        if strong_validation:
+            return "positive"
+        return "mixed" if evidence == "high" else "neutral"
+    if status == "stable":
+        return "mixed" if has_active else "neutral"
+    if status == "diverging":
+        return "mixed"
+    if status == "weakening":
+        return "negative" if evidence == "high" else "mixed"
+    if status == "insufficient_evidence":
+        return "neutral"
+    return "mixed"
+
+
+def infer_event_confidence(
+    evidence: str,
+    status: str,
+    high_medium_news_count: int,
+    *,
+    has_active: bool,
+    strong_validation: bool,
+) -> str:
+    if strong_validation:
+        return "high"
+    if status in {"diverging", "insufficient_evidence"}:
+        return "low" if evidence == "low" or not has_active else "medium"
+    if evidence == "high" and high_medium_news_count >= 3 and has_active:
+        return "medium"
+    if evidence == "low" or high_medium_news_count < 3:
+        return "low" if not has_active else "medium"
+    return "medium"
+
+
+def infer_event_type(industry_id: str, values: list[Any]) -> str:
+    text = " ".join(str(value) for value in values if value).lower()
+    compact = text.replace(" ", "")
+    if industry_id == "gold":
+        if contains_any(text, compact, ["real yield", "treasury yield", "yield", "rates", "实际利率", "美债收益率", "利率"]):
+            return "rates"
+        if contains_any(text, compact, ["central bank", "央行购金", "央行"]):
+            return "central_bank_demand"
+        if contains_any(text, compact, ["geopolitical", "war", "safe haven", "地缘", "避险"]):
+            return "safe_haven"
+        if contains_any(text, compact, ["dollar", "inflation", "美元", "通胀"]):
+            return "macro"
+    if industry_id in {"memory", "semiconductor"}:
+        if contains_any(text, compact, ["hbm", "dram", "nand", "ssd", "memory", "存储"]):
+            return "product"
+        if contains_any(text, compact, ["price cycle", "pricing", "价格周期", "涨价"]):
+            return "price_cycle"
+    if industry_id == "ai_compute":
+        if contains_any(text, compact, ["cloud capex", "data center capex", "capex", "资本开支"]):
+            return "capex"
+        if contains_any(text, compact, ["ai server", "power", "cooling", "服务器", "电力", "散热"]):
+            return "supply_chain"
+        if contains_any(text, compact, ["gpu", "accelerator", "加速器"]):
+            return "product"
+    if industry_id == "cpo_optical_module":
+        if contains_any(text, compact, ["800g", "1.6t", "transceiver", "optical module", "光模块"]):
+            return "product"
+        if contains_any(text, compact, ["cpo", "co-packaged", "silicon photonics", "硅光"]):
+            return "technology"
+        if contains_any(text, compact, ["interconnect", "bandwidth", "光互连", "带宽"]):
+            return "demand"
+    if industry_id == "semiconductor":
+        if contains_any(text, compact, ["advanced packaging", "cowos", "先进封装"]):
+            return "technology"
+        if contains_any(text, compact, ["foundry", "capacity", "tsmc", "产能"]):
+            return "supply_chain"
+        if contains_any(text, compact, ["ai infrastructure", "cloud capex", "capex", "资本开支"]):
+            return "capex"
+    if contains_any(text, compact, ["capex", "资本开支"]):
+        return "capex"
+    if contains_any(text, compact, ["demand", "需求"]):
+        return "demand"
+    if contains_any(text, compact, ["supply", "capacity", "inventory", "供应", "产能", "库存"]):
+        return "supply_chain"
+    if contains_any(text, compact, ["policy", "政策"]):
+        return "policy"
+    if contains_any(text, compact, ["risk", "风险"]):
+        return "risk"
+    if contains_any(text, compact, ["product", "产品", "commercial", "商业化"]):
+        return "product"
+    if contains_any(text, compact, ["technology", "tech", "技术"]):
+        return "technology"
+    return "mixed"
+
+
+def contains_any(text: str, compact: str, needles: list[str]) -> bool:
+    for needle in needles:
+        lowered = needle.lower()
+        if lowered in text or lowered.replace(" ", "") in compact:
+            return True
+    return False
+
+
+def semantic_framework_event(
+    date: str,
+    title_zh: str,
+    title: str,
+    description_zh: str,
+    description: str,
+    event_type: str,
+    impact: str,
+    confidence: str,
+) -> dict[str, Any]:
+    return {
+        "date": date,
+        "titleZh": title_zh,
+        "title": title,
+        "event_type": event_type,
+        "event_typeZh": EVENT_TYPE_ZH.get(event_type, event_type),
+        "impact": impact,
+        "impactZh": IMPACT_ZH.get(impact, impact),
+        "confidence": confidence,
+        "confidenceZh": CONFIDENCE_ZH.get(confidence, confidence),
+        "descriptionZh": description_zh,
+        "description": description,
+    }
 
 
 def framework_event(
