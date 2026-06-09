@@ -2409,11 +2409,33 @@ def current_action_suggestion(mode: str, discipline: str) -> str:
 def sharp_pullback_detected(asset_table: pd.DataFrame) -> bool:
     """Detect a fast pullback that is not yet a confirmed healthy pullback."""
 
-    if asset_table.empty or "当前回撤数值" not in asset_table.columns or "资产" not in asset_table.columns:
+    if is_missing_dataframe(asset_table) or "当前回撤数值" not in asset_table.columns or "资产" not in asset_table.columns:
         return False
     core = asset_table[asset_table["资产"].astype(str).str.contains("QQQ|SMH|SOXX", case=False, na=False)]
     drawdowns = pd.to_numeric(core.get("当前回撤数值"), errors="coerce")
     return bool(((drawdowns <= -0.05) & (drawdowns > -0.10)).any())
+
+
+def is_missing_row(row) -> bool:
+    """Return True when a row-like object has no usable data."""
+
+    if row is None:
+        return True
+    if isinstance(row, pd.Series):
+        return row.empty
+    if isinstance(row, dict):
+        return len(row) == 0
+    return False
+
+
+def is_missing_dataframe(df) -> bool:
+    """Return True when a DataFrame-like object is None or empty."""
+
+    if df is None:
+        return True
+    if isinstance(df, pd.DataFrame):
+        return df.empty
+    return False
 
 
 def build_core_asset_decision_rows(asset_table: pd.DataFrame) -> pd.DataFrame:
@@ -2422,8 +2444,8 @@ def build_core_asset_decision_rows(asset_table: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for symbol in ["QQQ", "SMH", "SOXX", "GLD", "UUP", "TLT"]:
         row = risk_row_from_asset_table(asset_table, [symbol])
-        if not row:
-            rows.append({"资产": symbol, "观察": "数据不足", "说明": "暂无法判断。"})
+        if is_missing_row(row):
+            rows.append({"资产": symbol, "观察": "数据不足", "说明": "暂无法判断", "data_quality": "missing"})
             continue
         rsi = row_float(row, "RSI数值")
         drawdown = row_float(row, "当前回撤数值")
@@ -2432,6 +2454,7 @@ def build_core_asset_decision_rows(asset_table: pd.DataFrame) -> pd.DataFrame:
                 "资产": symbol,
                 "观察": str(row.get("风险状态", "N/A")),
                 "说明": explain_core_asset(symbol, rsi, drawdown, str(row.get("风险状态", ""))),
+                "data_quality": "fresh",
             }
         )
     return pd.DataFrame(rows)
