@@ -22,7 +22,7 @@ if str(ROOT) not in sys.path:
 if "streamlit" not in sys.modules:
     sys.modules["streamlit"] = types.SimpleNamespace(cache_data=lambda *args, **kwargs: (lambda func: func))
 
-from src.industry_catalyst_framework_store import get_effective_catalyst_framework  # noqa: E402
+from src.industry_catalyst_framework_store import clean_catalyst_names, get_effective_catalyst_framework  # noqa: E402
 from src.industry_export import build_industry_markdown  # noqa: E402
 from src.industry_trend_data import industryTrendData  # noqa: E402
 
@@ -168,6 +168,8 @@ def audit_industry(industry: dict[str, Any], overrides: dict[str, Any], snapshot
     override = overrides.get(industry_id) if isinstance(overrides, dict) else None
     events = [event for event in framework.get("events", []) or [] if isinstance(event, dict)]
     themes = collect_theme_names(snapshot)
+    if industry_id == "liquor":
+        themes = clean_catalyst_names(themes)
     notes: list[str] = []
 
     event_type_issue = detect_event_type_issue(industry_id, events, notes)

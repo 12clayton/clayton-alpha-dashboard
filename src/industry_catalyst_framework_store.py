@@ -82,6 +82,10 @@ EVENT_TYPE_ZH = {
     "central_bank_demand": "央行需求",
     "capex": "资本开支",
     "demand": "需求",
+    "consumption": "消费",
+    "channel": "渠道",
+    "inventory": "库存",
+    "pricing": "价格",
     "supply_chain": "供应链",
     "product": "产品",
     "technology": "技术",
@@ -284,11 +288,13 @@ def reconcile_effective_framework_with_snapshot(industry_id: str, framework: dic
     if not framework.get("is_override"):
         return framework
     snapshot = read_latest_catalyst_snapshot(industry_id)
-    if (
-        not snapshot
-        or not snapshot_is_newer_than_framework(snapshot, framework)
-        or not needs_snapshot_event_rebuild(framework.get("events") or [], snapshot)
-    ):
+    if not snapshot:
+        return framework
+    events = framework.get("events") or []
+    should_rebuild = snapshot_is_newer_than_framework(snapshot, framework) and needs_snapshot_event_rebuild(events, snapshot)
+    if industry_id == "liquor" and needs_liquor_semantic_rebuild(events):
+        should_rebuild = True
+    if not should_rebuild:
         return framework
 
     active = clean_catalyst_names(snapshot.get("active_catalysts") or [])
@@ -372,6 +378,20 @@ def needs_snapshot_event_rebuild(events: list[dict[str, Any]], snapshot: dict[st
     if (status in {"diverging", "weakening", "insufficient_evidence"} or evidence == "low") and has_strong_positive_high:
         return True
     return False
+
+
+def needs_liquor_semantic_rebuild(events: list[dict[str, Any]]) -> bool:
+    if not events:
+        return False
+    all_technology = all(event.get("event_type") == "technology" for event in events)
+    all_positive = all(event.get("impact") == "positive" for event in events)
+    text = " ".join(
+        str(event.get(key) or "")
+        for event in events
+        for key in ("title", "titleZh", "description", "descriptionZh")
+    ).lower()
+    has_news_core = "news" in text or "新闻" in text or "æ–°é—»" in text
+    return all_technology or all_positive or has_news_core
 
 
 def snapshot_news_count(snapshot: dict[str, Any]) -> int:
@@ -518,6 +538,7 @@ def build_semantic_override_events(
         first_zh = active_zh[0] if active_zh else first
         event_type = infer_event_type(industry_id, [*active, *active_zh])
         impact = infer_event_impact(status, evidence, has_active=True, strong_validation=can_strongly_validate)
+        impact = adjust_liquor_event_impact(industry_id, event_type, [*active, *active_zh], impact)
         confidence = infer_event_confidence(
             evidence,
             status,
@@ -543,6 +564,7 @@ def build_semantic_override_events(
         first_zh = emerging_zh[0] if emerging_zh else first
         event_type = infer_event_type(industry_id, [*emerging, *emerging_zh])
         impact = infer_event_impact(status, evidence, has_active=bool(active), strong_validation=False)
+        impact = adjust_liquor_event_impact(industry_id, event_type, [*emerging, *emerging_zh], impact)
         confidence = infer_event_confidence(
             evidence,
             status,
@@ -590,6 +612,7 @@ def build_semantic_override_events(
 
     if can_strongly_validate:
         event_type = infer_event_type(industry_id, [*active, *active_zh])
+        impact = adjust_liquor_event_impact(industry_id, event_type, [*active, *active_zh], "positive")
         events.append(
             semantic_framework_event(
                 today,
@@ -598,7 +621,7 @@ def build_semantic_override_events(
                 str(snapshot.get("coverage_note_zh") or "当前实时新闻对本地框架形成较强验证，但仍需结合价格确认观察。"),
                 str(snapshot.get("coverage_note") or "Current live news strongly validates the local framework, while price confirmation still needs monitoring."),
                 event_type,
-                "positive",
+                impact,
                 "high",
             )
         )
@@ -666,6 +689,24 @@ def infer_event_impact(status: str, evidence: str, *, has_active: bool, strong_v
     return "mixed"
 
 
+def adjust_liquor_event_impact(industry_id: str, event_type: str, values: list[Any], fallback: str) -> str:
+    if industry_id != "liquor":
+        return fallback
+    text = " ".join(str(value) for value in values if value).lower()
+    compact = text.replace(" ", "")
+    if event_type == "policy" or contains_any(text, compact, ["anti-corruption", "banquet ban", "反腐", "禁酒令"]):
+        return "negative"
+    if contains_any(text, compact, ["price inversion", "down", "decline", "pressure", "价格倒挂", "下行", "压力"]):
+        return "negative" if event_type in {"pricing", "inventory"} else "mixed"
+    if event_type in {"channel", "inventory", "pricing"}:
+        return "mixed"
+    if contains_any(text, compact, ["recovery", "improve", "复苏", "改善", "旺季"]):
+        return "positive"
+    if event_type in {"consumption", "demand"}:
+        return "mixed" if fallback == "neutral" else fallback
+    return fallback
+
+
 def infer_event_confidence(
     evidence: str,
     status: str,
@@ -688,6 +729,27 @@ def infer_event_confidence(
 def infer_event_type(industry_id: str, values: list[Any]) -> str:
     text = " ".join(str(value) for value in values if value).lower()
     compact = text.replace(" ", "")
+    if industry_id == "liquor":
+        if contains_any(text, compact, ["policy", "anti-corruption", "banquet ban", "tax", "反腐", "禁酒令", "税", "政策"]):
+            return "policy"
+        if contains_any(text, compact, ["risk", "pressure", "价格倒挂", "下行", "压力", "风险"]):
+            if contains_any(text, compact, ["channel", "dealer", "渠道", "经销商"]):
+                return "channel"
+            if contains_any(text, compact, ["inventory", "destocking", "库存", "去库存"]):
+                return "inventory"
+            if contains_any(text, compact, ["price", "pricing", "批价", "提价", "价格"]):
+                return "pricing"
+            return "risk"
+        if contains_any(text, compact, ["channel", "dealer", "sell-through", "渠道", "经销商", "动销"]):
+            return "channel"
+        if contains_any(text, compact, ["inventory", "destocking", "库存", "去库存"]):
+            return "inventory"
+        if contains_any(text, compact, ["price", "pricing", "批价", "提价", "价格"]):
+            return "pricing"
+        if contains_any(text, compact, ["consumption", "consumer", "banquet", "gift", "spring festival", "mid-autumn", "消费", "宴席", "礼赠", "春节", "中秋", "白酒", "高端酒", "次高端", "茅台", "五粮液", "泸州老窖", "liquor", "baijiu"]):
+            return "consumption"
+        if contains_any(text, compact, ["demand", "需求", "复苏"]):
+            return "demand"
     if industry_id == "gold":
         if contains_any(text, compact, ["real yield", "treasury yield", "yield", "rates", "实际利率", "美债收益率", "利率"]):
             return "rates"

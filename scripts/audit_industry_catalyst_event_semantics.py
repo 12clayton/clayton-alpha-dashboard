@@ -23,6 +23,7 @@ def main() -> int:
     issues: list[str] = []
     issues.extend(audit_gold_semantics())
     issues.extend(audit_memory_stopwords())
+    issues.extend(audit_liquor_semantics())
     issues.extend(audit_ai_compute_reinforced_high())
     issues.extend(audit_ai_compute_divergence())
     issues.extend(audit_markdown_raw_dict_cleanup())
@@ -94,6 +95,43 @@ def audit_memory_stopwords() -> list[str]:
         issues.append("memory stopword 'technology' should not become a validated catalyst title")
     if "HBM" not in titles and "HBM" not in titles_zh:
         issues.append("memory should retain HBM / DRAM after stopword filtering")
+    return issues
+
+
+def audit_liquor_semantics() -> list[str]:
+    snapshot = {
+        "review_status": "stable",
+        "evidence_level": "medium",
+        "active_catalyst_themes": [
+            theme("news", "news"),
+            theme("Baijiu consumption recovery", "白酒消费复苏"),
+        ],
+        "emerging_catalyst_themes": [
+            theme("Channel inventory pressure", "渠道库存压力"),
+            theme("Wholesale price decline", "批价下行"),
+        ],
+    }
+    override = build_framework_override_from_snapshot(
+        "liquor",
+        {},
+        snapshot,
+        {"evidence_level": "medium"},
+        {"live_news_count_7d": 2, "items": [{"relevance": "medium"} for _ in range(2)]},
+    )
+    events = override.get("events") or []
+    issues = []
+    titles = " ".join(str(event.get("title") or "") for event in events)
+    titles_zh = " ".join(str(event.get("titleZh") or "") for event in events)
+    event_types = {event.get("event_type") for event in events}
+    impacts = {event.get("impact") for event in events}
+    if "news receives" in titles.lower() or "news remains" in titles.lower() or "news获得" in titles_zh.lower():
+        issues.append("liquor stopword 'news' should not become an event title")
+    if "technology" in event_types:
+        issues.append("liquor should not classify consumer/channel/inventory/pricing themes as technology")
+    if not event_types.intersection({"consumption", "demand", "channel", "inventory", "pricing", "risk"}):
+        issues.append(f"liquor should identify consumption/channel/inventory/pricing/risk semantics, got {sorted(event_types)}")
+    if impacts == {"positive"}:
+        issues.append("liquor mixed pressure themes should not produce all-positive events")
     return issues
 
 
