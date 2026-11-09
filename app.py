@@ -3139,7 +3139,7 @@ def public_trade_status(status: str) -> str:
     return mask_amounts_in_text(text)
 
 
-@st.cache_data(ttl=300, show_spinner="正在获取基金净值…")
+@st.cache_data(ttl=60, show_spinner="正在获取基金净值…")
 def load_or_fetch_fund_navs(funds: pd.DataFrame) -> pd.DataFrame:
     """Delegate real NAV loading/fetching to the provider layer."""
 

@@ -86,7 +86,13 @@ def get_latest_fund_nav(fund_code: str, fund_name: str, cache_path: Path, manual
     cached = find_cached_nav(cache_path, code)
     if cached is not None:
         return cached
-    return missing_nav_row(code, fund_name, "missing_nav", "缓存缺失")
+    # Only public, dated NAV observations; never portfolio amounts or synthetic values.
+    snapshot_path = Path(__file__).resolve().parents[1] / "config" / "public_nav_snapshot.csv"
+    snapshot = find_cached_nav(snapshot_path, code)
+    if snapshot is not None:
+        snapshot["error_message"] = "在线接口暂不可用，使用已核验公开净值快照；请核对净值日期"
+        return snapshot
+    return missing_nav_row(code, fund_name, "missing_nav", "接口不可用且无缓存")
 
 
 def find_manual_nav(manual_nav_path: Path, fund_code: str) -> dict[str, Any] | None:
