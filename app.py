@@ -74,6 +74,11 @@ st.set_page_config(
 )
 
 
+# Cache remote results across widget reruns; failures retry after one minute.
+load_public_market_snapshot = st.cache_data(ttl=60, show_spinner="正在获取市场行情…")(load_public_market_snapshot)
+load_public_ohlc_data = st.cache_data(ttl=60, show_spinner=False)(load_public_ohlc_data)
+load_public_news = st.cache_data(ttl=300, show_spinner="正在更新新闻…")(load_public_news)
+
 def main() -> None:
     """Render the investment monitoring website."""
 
@@ -3134,6 +3139,7 @@ def public_trade_status(status: str) -> str:
     return mask_amounts_in_text(text)
 
 
+@st.cache_data(ttl=300, show_spinner="正在获取基金净值…")
 def load_or_fetch_fund_navs(funds: pd.DataFrame) -> pd.DataFrame:
     """Delegate real NAV loading/fetching to the provider layer."""
 

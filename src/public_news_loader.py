@@ -9,6 +9,8 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import quote_plus
 
+import requests
+from concurrent.futures import ThreadPoolExecutor
 import feedparser
 import pandas as pd
 import yaml
@@ -47,8 +49,9 @@ def load_public_news(
 
     sources = build_public_news_sources(sources_path)
     rows = []
-    for source in sources:
-        rows.extend(fetch_rss_source(source))
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for batch in pool.map(fetch_rss_source, sources):
+            rows.extend(batch)
     frame = normalize_news_rows(rows)
     if frame.empty and cache_path is not None:
         frame = load_public_news_cache(cache_path)
@@ -92,7 +95,9 @@ def fetch_rss_source(source: dict) -> list[dict]:
     """Fetch one RSS source safely."""
 
     try:
-        feed = feedparser.parse(source["url"])
+        response = requests.get(source["url"], timeout=(3, 6), headers={"User-Agent": "Mozilla/5.0"})
+        response.raise_for_status()
+        feed = feedparser.parse(response.content)
     except Exception:
         return []
     rows = []

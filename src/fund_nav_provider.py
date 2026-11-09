@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from io import StringIO
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -66,13 +67,13 @@ def update_fund_nav_cache(
 
 
 def get_latest_fund_nav(fund_code: str, fund_name: str, cache_path: Path, manual_nav_path: Path | None = None) -> dict[str, Any]:
-    """Get one latest NAV row from AKShare, Eastmoney, then local cache."""
+    """Get real NAV through bounded Eastmoney endpoints, then local cache."""
 
     code = normalize_fund_code(fund_code)
     if not code:
         return missing_nav_row("", fund_name, "missing_code", "基金代码缺失")
 
-    for fetcher in (fetch_nav_from_akshare, fetch_nav_from_eastmoney):
+    for fetcher in (fetch_nav_from_eastmoney_json, fetch_nav_from_eastmoney):
         row = fetcher(code, fund_name)
         if row.get("data_quality") == "fresh":
             upsert_nav_cache(cache_path, row)
@@ -148,6 +149,26 @@ def fetch_nav_from_akshare(fund_code: str, fund_name: str) -> dict[str, Any]:
     )
 
 
+def fetch_nav_from_eastmoney_json(fund_code: str, fund_name: str) -> dict[str, Any]:
+    """Use the bounded JSON NAV endpoint before legacy HTML parsing."""
+    try:
+        response = requests.get(
+            "https://api.fund.eastmoney.com/f10/lsjz",
+            params={"fundCode": fund_code, "pageIndex": 1, "pageSize": 5},
+            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://fundf10.eastmoney.com/"},
+            timeout=(3, 6),
+        )
+        response.raise_for_status()
+        records = response.json().get("Data", {}).get("LSJZList", [])
+        if records:
+            row = normalize_nav_record(records[0], fund_code, fund_name, "eastmoney_f10")
+            if row.get("nav") is not None:
+                return row
+    except (requests.RequestException, ValueError, AttributeError, TypeError):
+        pass
+    return missing_nav_row(fund_code, fund_name, "missing_nav", "净值 JSON 接口暂不可用")
+
+
 def fetch_nav_from_eastmoney(fund_code: str, fund_name: str) -> dict[str, Any]:
     """Fetch latest NAV from Eastmoney F10 historical NAV endpoint."""
 
@@ -156,11 +177,10 @@ def fetch_nav_from_eastmoney(fund_code: str, fund_name: str) -> dict[str, Any]:
     last_error = "网络失败"
     for base_url in (
         "https://fund.eastmoney.com/f10/F10DataApi.aspx",
-        "http://fund.eastmoney.com/f10/F10DataApi.aspx",
         "https://fundf10.eastmoney.com/F10DataApi.aspx",
     ):
         try:
-            response = requests.get(base_url, params=params, headers=headers, timeout=10)
+            response = requests.get(base_url, params=params, headers=headers, timeout=(3, 6))
             response.raise_for_status()
             response.encoding = response.apparent_encoding or "utf-8"
             return parse_eastmoney_response(response.text, fund_code, fund_name)
@@ -177,7 +197,7 @@ def parse_eastmoney_response(text: str, fund_code: str, fund_name: str) -> dict[
     """Parse latest NAV from Eastmoney HTML response."""
 
     try:
-        tables = pd.read_html(text)
+        tables = pd.read_html(StringIO(text))
     except Exception:
         tables = []
 
@@ -208,8 +228,8 @@ def normalize_nav_record(record: dict[str, Any], fund_code: str, fund_name: str,
     nav_date = first_present(record, ["净值日期", "日期", "FSRQ", "nav_date"])
     nav = first_present(record, ["单位净值", "单位净值走势", "DWJZ", "nav"])
     daily_return = first_present(record, ["日增长率", "日涨幅", "JZZZL", "daily_return"])
-    purchase_status = first_present(record, ["申购状态", "purchase_status"])
-    redemption_status = first_present(record, ["赎回状态", "redemption_status"])
+    purchase_status = first_present(record, ["申购状态", "SGZT", "purchase_status"])
+    redemption_status = first_present(record, ["赎回状态", "SHZT", "redemption_status"])
     return {
         "fund_code": normalize_fund_code(fund_code),
         "fund_name": fund_name,
