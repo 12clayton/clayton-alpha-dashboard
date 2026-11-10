@@ -828,7 +828,6 @@ def render_sidebar(profile: dict, report_date: str, app_mode: dict) -> str:
         st.markdown(f"### {profile['user_name']} Alpha Desk")
         st.caption(f"当前模式：{app_mode.get('mode', 'private')}")
         selected_page = st.radio("页面导航", pages, label_visibility="collapsed")
-        st.page_link("pages/10_Multi_Alpha_Strategy_Lab.py", label="多策略研究实验室", icon="🧪")
         st.divider()
         st.caption(f"当前日期：{format_chinese_date(now)}")
         render_small_clock()

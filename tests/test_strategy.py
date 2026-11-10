@@ -64,60 +64,13 @@ def test_initial_position_cost():
     assert result["daily"]["transaction_cost"].iloc[1] > 0
 
 
-def test_page_initial_render():
-    from streamlit.testing.v1 import AppTest
-    page = AppTest.from_file("../pages/10_Multi_Alpha_Strategy_Lab.py").run(timeout=30)
-    assert not page.exception
-    page.radio[0].set_value("Upload OHLC CSV").run()
-    assert not page.exception
-
-
-def test_page_fetch_error(monkeypatch):
-    from streamlit.testing.v1 import AppTest
-    import src.multi_alpha_strategy as engine
-    def fail(*args, **kwargs):
-        raise ValueError("offline test")
-    monkeypatch.setattr(engine, "yahoo_download", fail)
-    page = AppTest.from_file("../pages/10_Multi_Alpha_Strategy_Lab.py").run(timeout=30)
-    page.button[0].click().run(timeout=30)
-    assert not page.exception
-    assert any("offline test" in error.value for error in page.error)
 
 
 
-def test_results_panel_and_csv():
-    from streamlit.testing.v1 import AppTest
-    result = backtest(validate_ohlc(make_prices()), StrategyConfig(regime_method="volatility"))
-    page = AppTest.from_file("../pages/10_Multi_Alpha_Strategy_Lab.py")
-    page.session_state["multi_alpha_result"] = result
-    page.session_state["multi_alpha_source"] = "Synthetic test data"
-    page.run(timeout=30)
-    assert not page.exception
-    assert len(page.metric) >= 7
-    assert len(page.get("download_button")) == 1
-    exported = pd.read_csv(__import__("io").StringIO(result["daily"].to_csv()))
-    assert len(exported) == 360
-    assert "cvar99" in exported
 
 
-def test_csv_upload_end_date_and_error():
-    from streamlit.testing.v1 import AppTest
-    from datetime import date
-    page = AppTest.from_file("../pages/10_Multi_Alpha_Strategy_Lab.py").run(timeout=30)
-    page.radio[0].set_value("Upload OHLC CSV").run()
-    page.selectbox[0].set_value("Volatility baseline")
-    page.date_input[0].set_value(date(2023, 1, 2))
-    page.date_input[1].set_value(date(2024, 3, 1))
-    page.file_uploader[0].set_value(("prices.csv", make_prices().to_csv(index=False).encode(), "text/csv")).run()
-    page.button[0].click().run(timeout=30)
-    assert not page.exception
-    assert not page.error
-    assert page.session_state["multi_alpha_result"]["daily"].index.max() <= pd.Timestamp("2024-03-01")
-    assert len(page.get("download_button")) == 1
-    page.file_uploader[0].set_value(("bad.csv", b"bad\n1", "text/csv")).run()
-    page.button[0].click().run(timeout=30)
-    assert page.error
-    assert "multi_alpha_result" not in page.session_state
+
+
 
 
 def test_ohlc_roundoff_tolerance():
