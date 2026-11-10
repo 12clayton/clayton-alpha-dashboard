@@ -828,6 +828,7 @@ def render_sidebar(profile: dict, report_date: str, app_mode: dict) -> str:
         st.markdown(f"### {profile['user_name']} Alpha Desk")
         st.caption(f"当前模式：{app_mode.get('mode', 'private')}")
         selected_page = st.radio("页面导航", pages, label_visibility="collapsed")
+        st.page_link("pages/10_Multi_Alpha_Strategy_Lab.py", label="多策略研究实验室", icon="🧪")
         st.divider()
         st.caption(f"当前日期：{format_chinese_date(now)}")
         render_small_clock()
@@ -2580,8 +2581,8 @@ def build_markdown_market_rows(asset_table: pd.DataFrame) -> list[dict]:
                 "今日涨跌": format_percent_plain(float(latest.get("TodayReturn")) if latest is not None and pd.notna(latest.get("TodayReturn")) else row_float(row, "今日涨跌幅数值")),
                 "RSI": format_number_plain(float(latest.get("RSI14")) if latest is not None and pd.notna(latest.get("RSI14")) else row_float(row, "RSI数值")),
                 "距离高点回撤": format_percent_plain(float(latest.get("Drawdown")) if latest is not None and pd.notna(latest.get("Drawdown")) else row_float(row, "当前回撤数值")),
-                "1月收益": format_period_return(calculate_period_return(frame, "1m")),
-                "3月收益": format_period_return(calculate_period_return(frame, "3m")),
+                "1月收益": format_period_return(calculate_period_return(frame, "1个月")),
+                "3月收益": format_period_return(calculate_period_return(frame, "3个月")),
                 "数据质量": "fresh" if latest is not None else "missing",
             }
         )
